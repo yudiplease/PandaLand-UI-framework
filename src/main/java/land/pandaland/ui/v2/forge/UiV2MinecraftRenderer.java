@@ -10,6 +10,7 @@ import land.pandaland.ui.v2.render.UiRenderTraversal;
 import land.pandaland.ui.v2.style.UiTheme;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
 
@@ -17,6 +18,7 @@ import org.lwjgl.opengl.GL11;
 public final class UiV2MinecraftRenderer extends Gui {
     private final Minecraft minecraft;
     private final UiTheme theme = UiTheme.pandalandDefault();
+    private int clipDepth;
 
     public UiV2MinecraftRenderer(Minecraft minecraft) {
         this.minecraft = minecraft;
@@ -47,10 +49,34 @@ public final class UiV2MinecraftRenderer extends Gui {
             UiRect rect = command.rect();
             minecraft.getTextureManager().bindTexture(new ResourceLocation(command.texture()));
             drawTexturedModalRect(rect.x, rect.y, 0, 0, rect.width, rect.height);
+        } else if (command.type() == UiRenderCommand.Type.CLIP_START) {
+            beginClip(command.rect());
+        } else if (command.type() == UiRenderCommand.Type.CLIP_END) {
+            endClip();
         } else if (command.type() == UiRenderCommand.Type.PROGRESS) {
             UiRect rect = command.rect();
             int fillWidth = Math.max(0, Math.round((rect.width - 8) * command.amount()));
             drawRect(rect.x + 4, rect.y + rect.height - 5, rect.x + 4 + fillWidth, rect.y + rect.height - 3, command.color().argb());
+        }
+    }
+
+    private void beginClip(UiRect rect) {
+        if (rect == null) {
+            return;
+        }
+        ScaledResolution resolution = new ScaledResolution(minecraft, minecraft.displayWidth, minecraft.displayHeight);
+        int scale = resolution.getScaleFactor();
+        GL11.glEnable(GL11.GL_SCISSOR_TEST);
+        GL11.glScissor(rect.x * scale, minecraft.displayHeight - (rect.y + rect.height) * scale, rect.width * scale, rect.height * scale);
+        clipDepth++;
+    }
+
+    private void endClip() {
+        if (clipDepth > 0) {
+            clipDepth--;
+        }
+        if (clipDepth == 0) {
+            GL11.glDisable(GL11.GL_SCISSOR_TEST);
         }
     }
 

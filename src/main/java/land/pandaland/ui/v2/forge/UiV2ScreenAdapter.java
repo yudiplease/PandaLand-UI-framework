@@ -6,6 +6,7 @@ import land.pandaland.ui.v2.core.UiRuntime;
 import land.pandaland.ui.v2.core.UiScreen;
 import land.pandaland.ui.v2.layout.UiRect;
 import net.minecraft.client.gui.GuiScreen;
+import org.lwjgl.input.Mouse;
 
 /**
  * Minecraft {@link GuiScreen} adapter for retained v2 UI screens.
@@ -73,6 +74,16 @@ public class UiV2ScreenAdapter extends GuiScreen {
     protected void mouseClickMove(int mouseX, int mouseY, int button, long dragTimeMs) {
         if (!runtime.events().pointerDrag(mouseX, mouseY, button, dragTimeMs)) {
             super.mouseClickMove(mouseX, mouseY, button, dragTimeMs);
+        }
+    }
+
+    public void handleMouseInput() {
+        super.handleMouseInput();
+        int amount = Mouse.getEventDWheel();
+        if (amount != 0 && runtime != null) {
+            int mouseX = Mouse.getEventX() * width / mc.displayWidth;
+            int mouseY = height - Mouse.getEventY() * height / mc.displayHeight - 1;
+            runtime.events().pointerWheel(mouseX, mouseY, amount);
         }
     }
 

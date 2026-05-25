@@ -58,6 +58,7 @@ dependencies {
 }
 
 processResources {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     inputs.property 'version', project.version
     inputs.property 'mcversion', minecraft_version
 

@@ -1,5 +1,8 @@
 package land.pandaland.ui.v2.style;
 
+/**
+ * Immutable visual theme used by v2 render traversal.
+ */
 public final class UiTheme {
     private final String font;
     private final int panelRadius;
@@ -27,6 +30,11 @@ public final class UiTheme {
         reducedMotion = builder.reducedMotion;
     }
 
+    /**
+     * Creates the default PandaLand liquid-glass inspired theme.
+     *
+     * @return default PandaLand theme
+     */
     public static UiTheme pandalandDefault() {
         return new Builder()
             .font("pandaland_ui:fonts/minecraft-rus.ttf")
@@ -43,46 +51,101 @@ public final class UiTheme {
             .build();
     }
 
+    /**
+     * Returns the logical font resource id.
+     *
+     * @return font resource path
+     */
     public String font() {
         return font;
     }
 
+    /**
+     * Returns panel corner radius.
+     *
+     * @return radius in scaled GUI pixels
+     */
     public int panelRadius() {
         return panelRadius;
     }
 
+    /**
+     * Returns button corner radius.
+     *
+     * @return radius in scaled GUI pixels
+     */
     public int buttonRadius() {
         return buttonRadius;
     }
 
+    /**
+     * Returns the base color for panels.
+     *
+     * @return panel color
+     */
     public UiColor panelBase() {
         return panelBase;
     }
 
+    /**
+     * Returns the base color for buttons and controls.
+     *
+     * @return button color
+     */
     public UiColor buttonBase() {
         return buttonBase;
     }
 
+    /**
+     * Returns the primary accent color.
+     *
+     * @return primary accent
+     */
     public UiColor primaryAccent() {
         return primaryAccent;
     }
 
+    /**
+     * Returns the secondary accent color.
+     *
+     * @return secondary accent
+     */
     public UiColor secondaryAccent() {
         return secondaryAccent;
     }
 
+    /**
+     * Returns the danger/error accent color.
+     *
+     * @return danger accent
+     */
     public UiColor dangerAccent() {
         return dangerAccent;
     }
 
+    /**
+     * Returns the primary text color.
+     *
+     * @return primary text color
+     */
     public UiColor textPrimary() {
         return textPrimary;
     }
 
+    /**
+     * Returns the muted text color.
+     *
+     * @return muted text color
+     */
     public UiColor textMuted() {
         return textMuted;
     }
 
+    /**
+     * Reports whether animation should be reduced.
+     *
+     * @return {@code true} when motion-sensitive animation should be disabled
+     */
     public boolean reducedMotion() {
         return reducedMotion;
     }

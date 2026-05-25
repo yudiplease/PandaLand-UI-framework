@@ -27,4 +27,26 @@ public final class UiLayoutEngineTest {
 
         assertEquals(new UiRect(2, 2, 46, 10), result.children().get(0));
     }
+
+    @Test
+    public void rowDistributesExtraSpaceToGrowChildren() {
+        UiLayoutStyle parent = UiLayoutStyle.row().gap(2);
+        UiLayoutStyle first = UiLayoutStyle.leaf().size(20, 10).grow(1.0F);
+        UiLayoutStyle second = UiLayoutStyle.leaf().size(20, 10);
+
+        UiLayoutEngine.Result result = UiLayoutEngine.layout(parent, new UiRect(0, 0, 80, 20), Arrays.asList(first, second));
+
+        assertEquals(new UiRect(0, 0, 58, 10), result.children().get(0));
+        assertEquals(new UiRect(60, 0, 20, 10), result.children().get(1));
+    }
+
+    @Test
+    public void columnAlignsChildToCenter() {
+        UiLayoutStyle parent = UiLayoutStyle.column().align(UiLayoutStyle.Align.CENTER);
+        UiLayoutStyle child = UiLayoutStyle.leaf().size(20, 10);
+
+        UiLayoutEngine.Result result = UiLayoutEngine.layout(parent, new UiRect(0, 0, 80, 20), Arrays.asList(child));
+
+        assertEquals(new UiRect(30, 0, 20, 10), result.children().get(0));
+    }
 }
