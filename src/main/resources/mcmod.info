@@ -1,0 +1,16 @@
+[
+  {
+    "modid": "pandaland_ui",
+    "name": "PandaLand UI Framework",
+    "description": "Shared client-side UI framework for PandaLand custom mods.",
+    "version": "${version}",
+    "mcversion": "${mcversion}",
+    "url": "",
+    "updateUrl": "",
+    "authorList": ["PandaLand"],
+    "credits": "PandaLand project",
+    "logoFile": "",
+    "screenshots": [],
+    "dependencies": []
+  }
+]

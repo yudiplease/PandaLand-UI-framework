@@ -1,0 +1,27 @@
+.gradle/
+.tools/
+**build/
+!src/**/build/
+run/
+logs/
+docs/
+.superpowers/
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+.gradletasknamecache
+
+# IDE files
+.idea/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+.vscode/
+
+# OS trash and metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
