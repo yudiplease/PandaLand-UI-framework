@@ -33,6 +33,12 @@ public final class UiLayoutEngine {
         if (parent.direction() == UiLayoutStyle.Direction.ROW) {
             return layoutRow(parent, bounds, safeChildren);
         }
+        if (parent.direction() == UiLayoutStyle.Direction.GRID) {
+            return layoutGrid(parent, bounds, safeChildren);
+        }
+        if (parent.direction() == UiLayoutStyle.Direction.ABSOLUTE) {
+            return layoutAbsolute(parent, bounds, safeChildren);
+        }
         if (parent.direction() == UiLayoutStyle.Direction.OVERLAY) {
             return layoutOverlay(parent, bounds, safeChildren);
         }
@@ -53,7 +59,7 @@ public final class UiLayoutEngine {
         List<Integer> heights = distribute(children, contentHeight, true, parent.gap());
         for (int i = 0; i < children.size(); i++) {
             UiLayoutStyle child = children.get(i);
-            int height = Math.min(heights.get(i), Math.max(0, maxBottom - y));
+            int height = fitHeight(child, heights.get(i).intValue(), Math.max(0, maxBottom - y));
             int width = crossSize(child, contentWidth, false);
             int childX = alignedX(parent, child, x, contentWidth, width);
             rects.add(new UiRect(childX, y, width, height));
@@ -63,6 +69,9 @@ public final class UiLayoutEngine {
     }
 
     private static Result layoutRow(UiLayoutStyle parent, UiRect bounds, List<UiLayoutStyle> children) {
+        if (parent.wrap()) {
+            return layoutWrappedRow(parent, bounds, children);
+        }
         UiInsets padding = parent.padding();
         int x = bounds.x + padding.left;
         int y = bounds.y + padding.top;
@@ -73,11 +82,76 @@ public final class UiLayoutEngine {
         List<Integer> widths = distribute(children, contentWidth, false, parent.gap());
         for (int i = 0; i < children.size(); i++) {
             UiLayoutStyle child = children.get(i);
-            int width = Math.min(widths.get(i), Math.max(0, maxRight - x));
+            int width = fitWidth(child, widths.get(i).intValue(), Math.max(0, maxRight - x));
             int height = crossSize(child, contentHeight, true);
             int childY = alignedY(parent, child, y, contentHeight, height);
             rects.add(new UiRect(x, childY, width, height));
             x += width + parent.gap();
+        }
+        return new Result(rects);
+    }
+
+    private static Result layoutWrappedRow(UiLayoutStyle parent, UiRect bounds, List<UiLayoutStyle> children) {
+        UiInsets padding = parent.padding();
+        int startX = bounds.x + padding.left;
+        int x = startX;
+        int y = bounds.y + padding.top;
+        int contentWidth = Math.max(0, bounds.width - padding.left - padding.right);
+        int contentHeight = Math.max(0, bounds.height - padding.top - padding.bottom);
+        int maxRight = bounds.x + bounds.width - padding.right;
+        List<UiRect> rects = new ArrayList<UiRect>();
+        int lineHeight = 0;
+        for (UiLayoutStyle child : children) {
+            int width = fitWidth(child, mainSize(child, contentWidth, false), contentWidth);
+            int height = crossSize(child, contentHeight, true);
+            if (x > startX && x + width > maxRight) {
+                x = startX;
+                y += lineHeight + parent.gap();
+                lineHeight = 0;
+            }
+            rects.add(new UiRect(x, y, width, height));
+            x += width + parent.gap();
+            lineHeight = Math.max(lineHeight, height);
+        }
+        return new Result(rects);
+    }
+
+    private static Result layoutGrid(UiLayoutStyle parent, UiRect bounds, List<UiLayoutStyle> children) {
+        UiInsets padding = parent.padding();
+        int contentX = bounds.x + padding.left;
+        int contentY = bounds.y + padding.top;
+        int contentWidth = Math.max(0, bounds.width - padding.left - padding.right);
+        int contentHeight = Math.max(0, bounds.height - padding.top - padding.bottom);
+        int columns = Math.max(1, parent.gridColumns());
+        int gap = parent.gap();
+        int cellWidth = Math.max(0, (contentWidth - Math.max(0, columns - 1) * gap) / columns);
+        int rowHeight = parent.gridRowHeight();
+        List<UiRect> rects = new ArrayList<UiRect>();
+        for (int i = 0; i < children.size(); i++) {
+            UiLayoutStyle child = children.get(i);
+            int column = i % columns;
+            int row = i / columns;
+            int cellX = contentX + column * (cellWidth + gap);
+            int cellY = contentY + row * (rowHeight + gap);
+            int width = clampWidth(child, cellWidth);
+            int height = clampHeight(child, rowHeight);
+            rects.add(new UiRect(cellX, cellY, width, height));
+        }
+        return new Result(rects);
+    }
+
+    private static Result layoutAbsolute(UiLayoutStyle parent, UiRect bounds, List<UiLayoutStyle> children) {
+        UiInsets padding = parent.padding();
+        int contentX = bounds.x + padding.left;
+        int contentY = bounds.y + padding.top;
+        int contentWidth = Math.max(0, bounds.width - padding.left - padding.right);
+        int contentHeight = Math.max(0, bounds.height - padding.top - padding.bottom);
+        List<UiRect> rects = new ArrayList<UiRect>();
+        for (UiLayoutStyle child : children) {
+            UiSize size = child.preferredSize();
+            int width = child.widthPercent() >= 0.0F ? Math.round(contentWidth * child.widthPercent()) : size.width;
+            int height = child.heightPercent() >= 0.0F ? Math.round(contentHeight * child.heightPercent()) : size.height;
+            rects.add(new UiRect(contentX + child.x(), contentY + child.y(), clampWidth(child, width), clampHeight(child, height)));
         }
         return new Result(rects);
     }
@@ -91,8 +165,8 @@ public final class UiLayoutEngine {
             Math.max(0, bounds.height - padding.top - padding.bottom)
         );
         List<UiRect> rects = new ArrayList<UiRect>();
-        for (int i = 0; i < children.size(); i++) {
-            rects.add(content);
+        for (UiLayoutStyle child : children) {
+            rects.add(new UiRect(content.x, content.y, clampWidth(child, content.width), clampHeight(child, content.height)));
         }
         return new Result(rects);
     }
@@ -105,8 +179,8 @@ public final class UiLayoutEngine {
         List<UiRect> rects = new ArrayList<UiRect>();
         for (UiLayoutStyle child : children) {
             UiSize size = child.preferredSize();
-            int width = child.widthPercent() >= 0.0F ? Math.round(contentWidth * child.widthPercent()) : Math.max(size.width, contentWidth);
-            int height = Math.max(0, size.height);
+            int width = clampWidth(child, child.widthPercent() >= 0.0F ? Math.round(contentWidth * child.widthPercent()) : Math.max(size.width, contentWidth));
+            int height = clampHeight(child, size.height);
             rects.add(new UiRect(x, y, width, height));
             y += height + parent.gap();
         }
@@ -149,6 +223,10 @@ public final class UiLayoutEngine {
                 }
             }
         }
+        for (int i = 0; i < children.size(); i++) {
+            UiLayoutStyle child = children.get(i);
+            sizes.set(i, Integer.valueOf(vertical ? clampHeight(child, sizes.get(i).intValue()) : clampWidth(child, sizes.get(i).intValue())));
+        }
         return sizes;
     }
 
@@ -156,22 +234,52 @@ public final class UiLayoutEngine {
         UiSize size = child.preferredSize();
         float percent = vertical ? child.heightPercent() : child.widthPercent();
         if (percent >= 0.0F) {
-            return Math.round(available * percent);
+            return vertical ? clampHeight(child, Math.round(available * percent)) : clampWidth(child, Math.round(available * percent));
         }
-        return Math.max(0, vertical ? size.height : size.width);
+        return vertical ? clampHeight(child, size.height) : clampWidth(child, size.width);
     }
 
     private static int crossSize(UiLayoutStyle child, int available, boolean verticalCross) {
         UiSize size = child.preferredSize();
         float percent = verticalCross ? child.heightPercent() : child.widthPercent();
         if (child.crossAlign() == UiLayoutStyle.Align.STRETCH) {
-            return available;
+            return verticalCross ? fitHeight(child, available, available) : fitWidth(child, available, available);
         }
         if (percent >= 0.0F) {
-            return Math.round(available * percent);
+            return verticalCross ? fitHeight(child, Math.round(available * percent), available) : fitWidth(child, Math.round(available * percent), available);
         }
         int preferred = verticalCross ? size.height : size.width;
-        return Math.min(Math.max(0, preferred), available);
+        return verticalCross ? fitHeight(child, preferred, available) : fitWidth(child, preferred, available);
+    }
+
+    private static int fitWidth(UiLayoutStyle style, int width, int available) {
+        return fit(width, Math.max(0, available), style.minWidth(), style.maxWidth());
+    }
+
+    private static int fitHeight(UiLayoutStyle style, int height, int available) {
+        return fit(height, Math.max(0, available), style.minHeight(), style.maxHeight());
+    }
+
+    private static int fit(int value, int available, int min, int max) {
+        int safeMin = Math.max(0, min);
+        if (safeMin > available) {
+            return clamp(safeMin, safeMin, max);
+        }
+        return Math.min(clamp(value, safeMin, max), available);
+    }
+
+    private static int clampWidth(UiLayoutStyle style, int width) {
+        return clamp(width, style.minWidth(), style.maxWidth());
+    }
+
+    private static int clampHeight(UiLayoutStyle style, int height) {
+        return clamp(height, style.minHeight(), style.maxHeight());
+    }
+
+    private static int clamp(int value, int min, int max) {
+        int safeMin = Math.max(0, min);
+        int safeMax = Math.max(safeMin, max);
+        return Math.max(safeMin, Math.min(safeMax, Math.max(0, value)));
     }
 
     private static int alignedX(UiLayoutStyle parent, UiLayoutStyle child, int x, int contentWidth, int width) {

@@ -1,11 +1,27 @@
 package land.pandaland.ui.v2.api;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import land.pandaland.ui.v2.components.UiCustomComponent;
 import land.pandaland.ui.v2.core.UiNode;
 import land.pandaland.ui.v2.core.UiScreen;
+import land.pandaland.ui.v2.data.UiListItem;
+import land.pandaland.ui.v2.data.UiModalOptions;
+import land.pandaland.ui.v2.data.UiOption;
+import land.pandaland.ui.v2.data.UiPage;
+import land.pandaland.ui.v2.data.UiRichTextSpan;
+import land.pandaland.ui.v2.data.UiTableColumn;
+import land.pandaland.ui.v2.data.UiTableRow;
+import land.pandaland.ui.v2.data.UiTooltipAttachment;
+import land.pandaland.ui.v2.data.UiTreeItem;
 import land.pandaland.ui.v2.layout.UiLayoutStyle;
 import land.pandaland.ui.v2.layout.UiLayoutStyle.Align;
+import land.pandaland.ui.v2.event.UiSelectionHandler;
 import land.pandaland.ui.v2.event.UiTextValidator;
 import land.pandaland.ui.v2.state.UiState;
+import land.pandaland.ui.v2.render.UiCustomDraw;
 
 /**
  * Public fluent entry point for PandaLand UI Framework v2 screens.
@@ -35,7 +51,21 @@ public final class Ui {
      * @return modal node
      */
     public static UiNode modal(String title) {
-        return new UiNode(UiNode.Type.MODAL).layoutStyle(UiLayoutStyle.column().padding(8).gap(6)).text(title);
+        return modal(new UiModalOptions(title));
+    }
+
+    /**
+     * Creates a modal node with public overlay options.
+     *
+     * @param options modal options
+     * @return modal node
+     */
+    public static UiNode modal(UiModalOptions options) {
+        UiModalOptions safeOptions = options == null ? new UiModalOptions("") : options;
+        return new UiNode(UiNode.Type.MODAL)
+                .layoutStyle(UiLayoutStyle.column().size(safeOptions.width(), safeOptions.height()).padding(8).gap(6))
+                .text(safeOptions.title())
+                .modalOptions(safeOptions);
     }
 
     /**
@@ -180,6 +210,33 @@ public final class Ui {
         }
 
         /**
+         * Adds a text input with optional input mask metadata.
+         *
+         * @param value bound text state
+         * @param placeholder placeholder shown when empty
+         * @param width input width
+         * @param height input height
+         * @param maxLength maximum character count
+         * @param inputMask optional input mask metadata
+         * @return this builder
+         */
+        public NodeBuilder textInput(UiState value, String placeholder, int width, int height, int maxLength, String inputMask) {
+            if (value == null) {
+                throw new IllegalArgumentException("value cannot be null");
+            }
+
+            node.add(new UiNode(UiNode.Type.TEXT_INPUT)
+                    .layoutStyle(UiLayoutStyle.leaf().size(width, height))
+                    .valueState(value)
+                    .placeholder(placeholder)
+                    .maxLength(maxLength)
+                    .inputMask(inputMask)
+                    .focusable(true));
+
+            return this;
+        }
+
+        /**
          * Adds a password input that masks visible characters.
          *
          * @param value bound text state
@@ -248,6 +305,122 @@ public final class Ui {
                     .validator(validator)
                     .focusable(true));
 
+            return this;
+        }
+
+        /**
+         * Adds a multi-line text input with default input mask metadata.
+         *
+         * @param value bound text state
+         * @param placeholder placeholder shown when empty
+         * @param width input width
+         * @param height input height
+         * @param maxLength maximum character count
+         * @return this builder
+         */
+        public NodeBuilder textarea(UiState value, String placeholder, int width, int height, int maxLength) {
+            return textarea(value, placeholder, width, height, maxLength, "");
+        }
+
+        /**
+         * Adds a multi-line text input.
+         *
+         * @param value bound text state
+         * @param placeholder placeholder shown when empty
+         * @param width input width
+         * @param height input height
+         * @param maxLength maximum character count
+         * @param inputMask optional input mask metadata
+         * @return this builder
+         */
+        public NodeBuilder textarea(UiState value, String placeholder, int width, int height, int maxLength, String inputMask) {
+            if (value == null) {
+                throw new IllegalArgumentException("value cannot be null");
+            }
+
+            node.add(new UiNode(UiNode.Type.TEXT_INPUT)
+                    .layoutStyle(UiLayoutStyle.leaf().size(width, height))
+                    .valueState(value)
+                    .placeholder(placeholder)
+                    .maxLength(maxLength)
+                    .inputMask(inputMask)
+                    .textArea(true)
+                    .focusable(true));
+            return this;
+        }
+
+        /**
+         * Adds a numeric text input with default input mask metadata.
+         *
+         * <p>Numeric inputs accept strict signed decimal text: an optional
+         * leading sign, at most one decimal point, and digits in all other
+         * positions.</p>
+         *
+         * @param value bound text state
+         * @param placeholder placeholder shown when empty
+         * @param width input width
+         * @param height input height
+         * @param maxLength maximum character count
+         * @return this builder
+         */
+        public NodeBuilder numericInput(UiState value, String placeholder, int width, int height, int maxLength) {
+            return numericInput(value, placeholder, width, height, maxLength, "");
+        }
+
+        /**
+         * Adds a numeric text input.
+         *
+         * <p>Numeric inputs accept strict signed decimal text: an optional
+         * leading sign, at most one decimal point, and digits in all other
+         * positions.</p>
+         *
+         * @param value bound text state
+         * @param placeholder placeholder shown when empty
+         * @param width input width
+         * @param height input height
+         * @param maxLength maximum character count
+         * @param inputMask optional input mask metadata
+         * @return this builder
+         */
+        public NodeBuilder numericInput(UiState value, String placeholder, int width, int height, int maxLength, String inputMask) {
+            if (value == null) {
+                throw new IllegalArgumentException("value cannot be null");
+            }
+
+            node.add(new UiNode(UiNode.Type.TEXT_INPUT)
+                    .layoutStyle(UiLayoutStyle.leaf().size(width, height))
+                    .valueState(value)
+                    .placeholder(placeholder)
+                    .maxLength(maxLength)
+                    .inputMask(inputMask)
+                    .numericInput(true)
+                    .focusable(true));
+            return this;
+        }
+
+        /**
+         * Adds a search text input.
+         *
+         * @param value bound text state
+         * @param placeholder placeholder shown when empty
+         * @param width input width
+         * @param height input height
+         * @param maxLength maximum character count
+         * @return this builder
+         */
+        public NodeBuilder searchInput(UiState value, String placeholder, int width, int height, int maxLength) {
+            if (value == null) {
+                throw new IllegalArgumentException("value cannot be null");
+            }
+
+            node.add(new UiNode(UiNode.Type.TEXT_INPUT)
+                    .layoutStyle(UiLayoutStyle.leaf().size(width, height))
+                    .valueState(value)
+                    .placeholder(placeholder)
+                    .maxLength(maxLength)
+                    .searchInput(true)
+                    .searchable(true)
+                    .focusable(true));
             return this;
         }
 
@@ -346,6 +519,28 @@ public final class Ui {
         }
 
         /**
+         * Uses fixed-column grid layout for this node.
+         *
+         * @param columns number of columns; values below one are clamped to one
+         * @param rowHeight fixed row height in scaled pixels
+         * @return this builder
+         */
+        public NodeBuilder grid(int columns, int rowHeight) {
+            node.layoutStyle(UiLayoutStyle.grid(columns, rowHeight));
+            return this;
+        }
+
+        /**
+         * Uses absolute layout for this node's children.
+         *
+         * @return this builder
+         */
+        public NodeBuilder absolute() {
+            node.layoutStyle(UiLayoutStyle.absolute());
+            return this;
+        }
+
+        /**
          * Sets preferred size for this node.
          *
          * @param width  preferred width
@@ -354,6 +549,143 @@ public final class Ui {
          */
         public NodeBuilder size(int width, int height) {
             node.layoutStyle().size(width, height);
+            return this;
+        }
+
+        /**
+         * Sets minimum size for this node.
+         *
+         * @param width minimum width
+         * @param height minimum height
+         * @return this builder
+         */
+        public NodeBuilder minSize(int width, int height) {
+            node.layoutStyle().minSize(width, height);
+            return this;
+        }
+
+        /**
+         * Sets maximum size for this node.
+         *
+         * @param width maximum width
+         * @param height maximum height
+         * @return this builder
+         */
+        public NodeBuilder maxSize(int width, int height) {
+            node.layoutStyle().maxSize(width, height);
+            return this;
+        }
+
+        /**
+         * Sets minimum resolved width for this node.
+         *
+         * @param width minimum width
+         * @return this builder
+         */
+        public NodeBuilder minWidth(int width) {
+            node.layoutStyle().minWidth(width);
+            return this;
+        }
+
+        /**
+         * Sets minimum resolved height for this node.
+         *
+         * @param height minimum height
+         * @return this builder
+         */
+        public NodeBuilder minHeight(int height) {
+            node.layoutStyle().minHeight(height);
+            return this;
+        }
+
+        /**
+         * Sets maximum resolved width for this node.
+         *
+         * @param width maximum width
+         * @return this builder
+         */
+        public NodeBuilder maxWidth(int width) {
+            node.layoutStyle().maxWidth(width);
+            return this;
+        }
+
+        /**
+         * Sets maximum resolved height for this node.
+         *
+         * @param height maximum height
+         * @return this builder
+         */
+        public NodeBuilder maxHeight(int height) {
+            node.layoutStyle().maxHeight(height);
+            return this;
+        }
+
+        /**
+         * Sets this node's offset from the parent content origin.
+         *
+         * @param x x offset
+         * @param y y offset
+         * @return this builder
+         */
+        public NodeBuilder offset(int x, int y) {
+            node.layoutStyle().offset(x, y);
+            return this;
+        }
+
+        /**
+         * Sets this node's x offset from the parent content origin.
+         *
+         * @param x x offset
+         * @return this builder
+         */
+        public NodeBuilder x(int x) {
+            node.layoutStyle().x(x);
+            return this;
+        }
+
+        /**
+         * Sets this node's y offset from the parent content origin.
+         *
+         * @param y y offset
+         * @return this builder
+         */
+        public NodeBuilder y(int y) {
+            node.layoutStyle().y(y);
+            return this;
+        }
+
+        /**
+         * Sets fixed grid column count for this node.
+         *
+         * @param columns number of columns; values below one are clamped to one
+         * @return this builder
+         */
+        public NodeBuilder gridColumns(int columns) {
+            node.layoutStyle().gridColumns(columns);
+            return this;
+        }
+
+        /**
+         * Sets fixed grid row height for this node.
+         *
+         * @param rowHeight row height in scaled pixels
+         * @return this builder
+         */
+        public NodeBuilder gridRowHeight(int rowHeight) {
+            node.layoutStyle().gridRowHeight(rowHeight);
+            return this;
+        }
+
+        /**
+         * Stores stacking index metadata for future render ordering support.
+         *
+         * <p>The current layout pass records this value but does not reorder nodes.</p>
+         *
+         * @param zIndex stacking index metadata
+         * @return this builder
+         */
+        public NodeBuilder zIndex(int zIndex) {
+            node.layoutStyle().zIndex(zIndex);
             return this;
         }
 
@@ -590,6 +922,354 @@ public final class Ui {
         }
 
         /**
+         * Adds a table control with typed column and row metadata.
+         *
+         * @param columns table column descriptors
+         * @param rows table row descriptors
+         * @param width table width
+         * @param height table height
+         * @return this builder
+         */
+        public NodeBuilder table(List<UiTableColumn> columns, List<UiTableRow> rows, int width, int height) {
+            return table(columns, rows, width, height, null);
+        }
+
+        /**
+         * Adds a table control with typed column and row metadata and a selection callback.
+         *
+         * @param columns table column descriptors
+         * @param rows table row descriptors
+         * @param width table width
+         * @param height table height
+         * @param onSelection callback invoked with selected row id and index
+         * @return this builder
+         */
+        public NodeBuilder table(List<UiTableColumn> columns, List<UiTableRow> rows, int width, int height, UiSelectionHandler onSelection) {
+            node.add(new UiNode(UiNode.Type.TABLE)
+                    .layoutStyle(UiLayoutStyle.leaf().size(width, height))
+                    .columns(columns)
+                    .rows(rows)
+                    .onSelection(onSelection)
+                    .focusable(true));
+            return this;
+        }
+
+        /**
+         * Adds a data-grid control with typed table metadata and selected row ids.
+         *
+         * @param columns grid column descriptors
+         * @param rows grid row descriptors
+         * @param selectedIds selected row ids
+         * @param width grid width
+         * @param height grid height
+         * @return this builder
+         */
+        public NodeBuilder dataGrid(List<UiTableColumn> columns, List<UiTableRow> rows, List<String> selectedIds, int width, int height) {
+            return dataGrid(columns, rows, selectedIds, width, height, null);
+        }
+
+        /**
+         * Adds a data-grid control with typed table metadata, selected row ids, and a selection callback.
+         *
+         * @param columns grid column descriptors
+         * @param rows grid row descriptors
+         * @param selectedIds selected row ids
+         * @param width grid width
+         * @param height grid height
+         * @param onSelection callback invoked with selected row id and index
+         * @return this builder
+         */
+        public NodeBuilder dataGrid(List<UiTableColumn> columns, List<UiTableRow> rows, List<String> selectedIds, int width, int height, UiSelectionHandler onSelection) {
+            node.add(new UiNode(UiNode.Type.DATA_GRID)
+                    .layoutStyle(UiLayoutStyle.leaf().size(width, height))
+                    .columns(columns)
+                    .rows(rows)
+                    .selectedIds(selectedIds)
+                    .multiSelect(true)
+                    .onSelection(onSelection)
+                    .focusable(true));
+            return this;
+        }
+
+        /**
+         * Adds a tree control with typed tree item metadata.
+         *
+         * @param treeItems root tree item descriptors
+         * @param selectedIds selected tree item ids
+         * @param width tree width
+         * @param height tree height
+         * @return this builder
+         */
+        public NodeBuilder tree(List<UiTreeItem> treeItems, List<String> selectedIds, int width, int height) {
+            return tree(treeItems, selectedIds, width, height, null);
+        }
+
+        /**
+         * Adds a tree control with typed tree item metadata and a selection callback.
+         *
+         * @param treeItems root tree item descriptors
+         * @param selectedIds selected tree item ids
+         * @param width tree width
+         * @param height tree height
+         * @param onSelection callback invoked with selected item id and index
+         * @return this builder
+         */
+        public NodeBuilder tree(List<UiTreeItem> treeItems, List<String> selectedIds, int width, int height, UiSelectionHandler onSelection) {
+            node.add(new UiNode(UiNode.Type.TREE)
+                    .layoutStyle(UiLayoutStyle.leaf().size(width, height))
+                    .treeItems(treeItems)
+                    .selectedIds(selectedIds)
+                    .onSelection(onSelection)
+                    .focusable(true));
+            return this;
+        }
+
+        /**
+         * Adds a virtualized list control with stable item ids.
+         *
+         * @param items list item descriptors
+         * @param selectedIds selected item ids
+         * @param width list width
+         * @param rowHeight row height used to estimate total virtual content
+         * @return this builder
+         */
+        public NodeBuilder virtualList(List<UiListItem> items, List<String> selectedIds, int width, int rowHeight) {
+            return virtualList(items, selectedIds, width, rowHeight, null);
+        }
+
+        /**
+         * Adds a virtualized list control with stable item ids and a selection callback.
+         *
+         * @param items list item descriptors
+         * @param selectedIds selected item ids
+         * @param width list width
+         * @param rowHeight row height used to estimate total virtual content
+         * @param onSelection callback invoked with selected id and index
+         * @return this builder
+         */
+        public NodeBuilder virtualList(List<UiListItem> items, List<String> selectedIds, int width, int rowHeight, UiSelectionHandler onSelection) {
+            int count = items == null ? 1 : Math.max(1, items.size());
+            node.add(new UiNode(UiNode.Type.LIST)
+                    .layoutStyle(UiLayoutStyle.column().size(width, Math.max(rowHeight, 1) * count))
+                    .items(items)
+                    .selectedIds(selectedIds)
+                    .virtualized(true)
+                    .onSelection(onSelection)
+                    .focusable(true));
+            return this;
+        }
+
+        /**
+         * Adds a rich text display control with styled spans.
+         *
+         * @param spans rich text spans
+         * @param width rich text width
+         * @param height rich text height
+         * @return this builder
+         */
+        public NodeBuilder richText(List<UiRichTextSpan> spans, int width, int height) {
+            node.add(new UiNode(UiNode.Type.RICH_TEXT)
+                    .layoutStyle(UiLayoutStyle.leaf().size(width, height))
+                    .spans(spans));
+            return this;
+        }
+
+        /**
+         * Adds a canvas node backed by a renderer-independent custom draw hook.
+         *
+         * @param draw custom draw hook that appends render commands
+         * @param width canvas width
+         * @param height canvas height
+         * @return this builder
+         */
+        public NodeBuilder canvas(UiCustomDraw draw, int width, int height) {
+            if (draw == null) {
+                throw new IllegalArgumentException("draw cannot be null");
+            }
+            node.add(new UiNode(UiNode.Type.CANVAS)
+                    .layoutStyle(UiLayoutStyle.leaf().size(width, height))
+                    .customDraw(draw));
+            return this;
+        }
+
+        /**
+         * Adds a feature-owned custom component node.
+         *
+         * <p>The component receives a build callback immediately, render
+         * callbacks during traversal, and pointer/key callbacks from the event
+         * dispatcher. The component API uses framework event and render types
+         * instead of Minecraft classes.</p>
+         *
+         * @param component custom component hook
+         * @param width component width
+         * @param height component height
+         * @return this builder
+         */
+        public NodeBuilder customComponent(UiCustomComponent component, int width, int height) {
+            if (component == null) {
+                throw new IllegalArgumentException("component cannot be null");
+            }
+            UiNode child = new UiNode(UiNode.Type.CUSTOM_COMPONENT)
+                    .layoutStyle(UiLayoutStyle.leaf().size(width, height))
+                    .customComponent(component)
+                    .focusable(true);
+            component.build(child);
+            node.add(child);
+            return this;
+        }
+
+        /**
+         * Adds a searchable select control with typed option metadata.
+         *
+         * @param label visible select label
+         * @param value bound selected id state
+         * @param options selectable option descriptors
+         * @param width control width
+         * @param height control height
+         * @return this builder
+         */
+        public NodeBuilder searchableSelect(String label, UiState<String> value, List<UiOption> options, int width, int height) {
+            return searchableSelect(label, value, options, width, height, null);
+        }
+
+        /**
+         * Adds a searchable select control with typed option metadata and a selection callback.
+         *
+         * @param label visible select label
+         * @param value bound selected id state
+         * @param options selectable option descriptors
+         * @param width control width
+         * @param height control height
+         * @param onSelection callback invoked with selected id and index
+         * @return this builder
+         */
+        public NodeBuilder searchableSelect(String label, UiState<String> value, List<UiOption> options, int width, int height, UiSelectionHandler onSelection) {
+            if (value == null) {
+                throw new IllegalArgumentException("value cannot be null");
+            }
+            node.add(new UiNode(UiNode.Type.SELECT)
+                    .layoutStyle(UiLayoutStyle.leaf().size(width, height))
+                    .text(label)
+                    .valueState(value)
+                    .items(optionItems(options))
+                    .searchable(true)
+                    .onSelection(onSelection)
+                    .focusable(true));
+            return this;
+        }
+
+        /**
+         * Adds a multi-select control with typed option metadata and selected ids.
+         *
+         * @param label visible select label
+         * @param options selectable option descriptors
+         * @param selectedIds selected option ids
+         * @param width control width
+         * @param height control height
+         * @return this builder
+         */
+        public NodeBuilder multiSelect(String label, List<UiOption> options, List<String> selectedIds, int width, int height) {
+            return multiSelect(label, options, selectedIds, width, height, null);
+        }
+
+        /**
+         * Adds a multi-select control with typed option metadata, selected ids, and a selection callback.
+         *
+         * @param label visible select label
+         * @param options selectable option descriptors
+         * @param selectedIds selected option ids
+         * @param width control width
+         * @param height control height
+         * @param onSelection callback invoked with selected option id and index
+         * @return this builder
+         */
+        public NodeBuilder multiSelect(String label, List<UiOption> options, List<String> selectedIds, int width, int height, UiSelectionHandler onSelection) {
+            node.add(new UiNode(UiNode.Type.SELECT)
+                    .layoutStyle(UiLayoutStyle.leaf().size(width, height))
+                    .text(label)
+                    .items(optionItems(options))
+                    .selectedIds(selectedIds)
+                    .multiSelect(true)
+                    .onSelection(onSelection)
+                    .focusable(true));
+            return this;
+        }
+
+        /**
+         * Adds a color picker control bound to an RGB integer state.
+         *
+         * @param label visible control label
+         * @param value bound RGB color state
+         * @param width control width
+         * @param height control height
+         * @return this builder
+         */
+        public NodeBuilder colorPicker(String label, UiState<Integer> value, int width, int height) {
+            if (value == null) {
+                throw new IllegalArgumentException("value cannot be null");
+            }
+            node.add(new UiNode(UiNode.Type.COLOR_PICKER)
+                    .layoutStyle(UiLayoutStyle.leaf().size(width, height))
+                    .text(label)
+                    .valueState(value)
+                    .focusable(true));
+            return this;
+        }
+
+        /**
+         * Adds a keybind capture input bound to a key identifier state.
+         *
+         * @param label visible input label
+         * @param value bound key identifier state
+         * @param width input width
+         * @param height input height
+         * @return this builder
+         */
+        public NodeBuilder keybindInput(String label, UiState<String> value, int width, int height) {
+            return keybindInput(label, value, width, height, null);
+        }
+
+        /**
+         * Adds a keybind capture input with a change callback.
+         *
+         * @param label visible input label
+         * @param value bound key identifier state
+         * @param width input width
+         * @param height input height
+         * @param onChange callback invoked after key capture
+         * @return this builder
+         */
+        public NodeBuilder keybindInput(String label, UiState<String> value, int width, int height, Runnable onChange) {
+            if (value == null) {
+                throw new IllegalArgumentException("value cannot be null");
+            }
+            node.add(new UiNode(UiNode.Type.KEYBIND_INPUT)
+                    .layoutStyle(UiLayoutStyle.leaf().size(width, height))
+                    .text(label)
+                    .valueState(value)
+                    .onChange(onChange)
+                    .focusable(true));
+            return this;
+        }
+
+        /**
+         * Adds a page stack control with typed page metadata.
+         *
+         * @param pages page descriptors
+         * @param selectedId initially selected page id
+         * @param width stack width
+         * @param height stack height
+         * @return this builder
+         */
+        public NodeBuilder pageStack(List<UiPage> pages, String selectedId, int width, int height) {
+            node.add(new UiNode(UiNode.Type.PAGE_STACK)
+                    .layoutStyle(UiLayoutStyle.column().size(width, height))
+                    .pages(pages)
+                    .selectedIds(selectedId == null ? Collections.<String>emptyList() : Collections.singletonList(selectedId)));
+            return this;
+        }
+
+        /**
          * Adds a tab selector.
          *
          * @param tabs tab labels
@@ -599,15 +1279,75 @@ public final class Ui {
          * @return this builder
          */
         public NodeBuilder tabs(String[] tabs, UiState selectedIndex, int width, int height) {
+            return tabs(tabs, selectedIndex, width, height, null);
+        }
+
+        /**
+         * Adds a tab selector with a selection callback.
+         *
+         * @param tabs tab labels
+         * @param selectedIndex bound selected index state
+         * @param width tab strip width
+         * @param height tab strip height
+         * @param onSelection callback invoked with selected tab id and index
+         * @return this builder
+         */
+        public NodeBuilder tabs(String[] tabs, UiState selectedIndex, int width, int height, UiSelectionHandler onSelection) {
             UiNode child = new UiNode(UiNode.Type.TABS)
                     .layoutStyle(UiLayoutStyle.row().size(width, height).gap(4))
                     .valueState(selectedIndex)
+                    .onSelection(onSelection)
                     .focusable(true);
             if (tabs != null) {
                 int tabWidth = tabs.length == 0 ? width : Math.max(1, width / tabs.length);
                 for (String tab : tabs) {
                     child.add(new UiNode(UiNode.Type.BUTTON).layoutStyle(UiLayoutStyle.leaf().size(tabWidth, height)).text(tab));
                 }
+            }
+            node.add(child);
+            return this;
+        }
+
+        /**
+         * Adds a typed tab selector with stable ids and disabled state.
+         *
+         * @param tabs tab option descriptors
+         * @param selectedId bound selected tab id state
+         * @param width tab strip width
+         * @param height tab strip height
+         * @return this builder
+         */
+        public NodeBuilder tabs(List<UiOption> tabs, UiState<String> selectedId, int width, int height) {
+            return tabs(tabs, selectedId, width, height, null);
+        }
+
+        /**
+         * Adds a typed tab selector with stable ids, disabled state, and a selection callback.
+         *
+         * @param tabs tab option descriptors
+         * @param selectedId bound selected tab id state
+         * @param width tab strip width
+         * @param height tab strip height
+         * @param onSelection callback invoked with selected tab id and index
+         * @return this builder
+         */
+        public NodeBuilder tabs(List<UiOption> tabs, UiState<String> selectedId, int width, int height, UiSelectionHandler onSelection) {
+            if (selectedId == null) {
+                throw new IllegalArgumentException("selectedId cannot be null");
+            }
+            List<UiListItem> items = optionItems(tabs);
+            UiNode child = new UiNode(UiNode.Type.TABS)
+                    .layoutStyle(UiLayoutStyle.row().size(width, height).gap(4))
+                    .valueState(selectedId)
+                    .items(items)
+                    .onSelection(onSelection)
+                    .focusable(true);
+            int tabWidth = items.isEmpty() ? width : Math.max(1, width / items.size());
+            for (UiListItem item : items) {
+                child.add(new UiNode(UiNode.Type.BUTTON)
+                        .layoutStyle(UiLayoutStyle.leaf().size(tabWidth, height))
+                        .text(item.label())
+                        .enabled(!item.disabled()));
             }
             node.add(child);
             return this;
@@ -622,7 +1362,23 @@ public final class Ui {
          * @return this builder
          */
         public NodeBuilder tooltip(String text, int width, int height) {
-            node.add(new UiNode(UiNode.Type.TOOLTIP).layoutStyle(UiLayoutStyle.leaf().size(width, height)).text(text));
+            return tooltip(text, width, height, null);
+        }
+
+        /**
+         * Adds a tooltip panel with attachment metadata.
+         *
+         * @param text tooltip text
+         * @param width tooltip width
+         * @param height tooltip height
+         * @param attachment tooltip attachment metadata
+         * @return this builder
+         */
+        public NodeBuilder tooltip(String text, int width, int height, UiTooltipAttachment attachment) {
+            node.add(new UiNode(UiNode.Type.TOOLTIP)
+                    .layoutStyle(UiLayoutStyle.leaf().size(width, height))
+                    .text(text)
+                    .tooltipAttachment(attachment));
             return this;
         }
 
@@ -753,6 +1509,19 @@ public final class Ui {
         public NodeBuilder icon(String texture, int width, int height) {
             node.add(new UiNode(UiNode.Type.LABEL).layoutStyle(UiLayoutStyle.leaf().size(width, height)).texture(texture));
             return this;
+        }
+
+        private static List<UiListItem> optionItems(List<UiOption> options) {
+            if (options == null || options.isEmpty()) {
+                return Collections.emptyList();
+            }
+            List<UiListItem> items = new ArrayList<UiListItem>(options.size());
+            for (UiOption option : options) {
+                if (option != null) {
+                    items.add(option.toListItem());
+                }
+            }
+            return items;
         }
     }
 }

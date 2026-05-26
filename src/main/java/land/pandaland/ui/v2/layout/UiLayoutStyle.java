@@ -31,7 +31,15 @@ public final class UiLayoutStyle {
         /**
          * Children are placed vertically in scrollable content.
          */
-        SCROLL
+        SCROLL,
+        /**
+         * Children are placed in a fixed-column grid.
+         */
+        GRID,
+        /**
+         * Children are placed at explicit offsets inside the parent content area.
+         */
+        ABSOLUTE
     }
 
     /**
@@ -61,6 +69,15 @@ public final class UiLayoutStyle {
     private int gap;
     private int width;
     private int height;
+    private int minWidth;
+    private int minHeight;
+    private int maxWidth = Integer.MAX_VALUE;
+    private int maxHeight = Integer.MAX_VALUE;
+    private int x;
+    private int y;
+    private int gridColumns = 1;
+    private int gridRowHeight;
+    private int zIndex;
     private float grow;
     private float shrink = 1.0F;
     private float widthPercent = -1.0F;
@@ -118,6 +135,26 @@ public final class UiLayoutStyle {
     }
 
     /**
+     * Creates a fixed-column grid style.
+     *
+     * @param columns number of columns; values below one are clamped to one
+     * @param rowHeight fixed row height in scaled GUI pixels
+     * @return grid style
+     */
+    public static UiLayoutStyle grid(int columns, int rowHeight) {
+        return new UiLayoutStyle(Direction.GRID).gridColumns(columns).gridRowHeight(rowHeight);
+    }
+
+    /**
+     * Creates an absolute-positioning style.
+     *
+     * @return absolute style
+     */
+    public static UiLayoutStyle absolute() {
+        return new UiLayoutStyle(Direction.ABSOLUTE);
+    }
+
+    /**
      * Sets equal padding on every side.
      *
      * @param padding padding in scaled GUI pixels
@@ -163,6 +200,145 @@ public final class UiLayoutStyle {
     public UiLayoutStyle size(int width, int height) {
         this.width = Math.max(0, width);
         this.height = Math.max(0, height);
+        return this;
+    }
+
+    /**
+     * Sets the minimum size for this node.
+     *
+     * @param width minimum width
+     * @param height minimum height
+     * @return this style
+     */
+    public UiLayoutStyle minSize(int width, int height) {
+        return minWidth(width).minHeight(height);
+    }
+
+    /**
+     * Sets the maximum size for this node.
+     *
+     * @param width maximum width
+     * @param height maximum height
+     * @return this style
+     */
+    public UiLayoutStyle maxSize(int width, int height) {
+        return maxWidth(width).maxHeight(height);
+    }
+
+    /**
+     * Sets the minimum resolved width for this node.
+     *
+     * @param minWidth minimum width
+     * @return this style
+     */
+    public UiLayoutStyle minWidth(int minWidth) {
+        this.minWidth = Math.max(0, minWidth);
+        return this;
+    }
+
+    /**
+     * Sets the minimum resolved height for this node.
+     *
+     * @param minHeight minimum height
+     * @return this style
+     */
+    public UiLayoutStyle minHeight(int minHeight) {
+        this.minHeight = Math.max(0, minHeight);
+        return this;
+    }
+
+    /**
+     * Sets the maximum resolved width for this node.
+     *
+     * @param maxWidth maximum width
+     * @return this style
+     */
+    public UiLayoutStyle maxWidth(int maxWidth) {
+        this.maxWidth = Math.max(0, maxWidth);
+        return this;
+    }
+
+    /**
+     * Sets the maximum resolved height for this node.
+     *
+     * @param maxHeight maximum height
+     * @return this style
+     */
+    public UiLayoutStyle maxHeight(int maxHeight) {
+        this.maxHeight = Math.max(0, maxHeight);
+        return this;
+    }
+
+    /**
+     * Sets this node's offset from the parent content origin.
+     *
+     * <p>Absolute layout uses these coordinates directly. Other layout modes
+     * keep the metadata for render and hit-test layers.</p>
+     *
+     * @param x x offset
+     * @param y y offset
+     * @return this style
+     */
+    public UiLayoutStyle offset(int x, int y) {
+        this.x = x;
+        this.y = y;
+        return this;
+    }
+
+    /**
+     * Sets this node's x offset from the parent content origin.
+     *
+     * @param x x offset
+     * @return this style
+     */
+    public UiLayoutStyle x(int x) {
+        this.x = x;
+        return this;
+    }
+
+    /**
+     * Sets this node's y offset from the parent content origin.
+     *
+     * @param y y offset
+     * @return this style
+     */
+    public UiLayoutStyle y(int y) {
+        this.y = y;
+        return this;
+    }
+
+    /**
+     * Sets the fixed column count used by grid layout.
+     *
+     * @param gridColumns number of columns; values below one are clamped to one
+     * @return this style
+     */
+    public UiLayoutStyle gridColumns(int gridColumns) {
+        this.gridColumns = Math.max(1, gridColumns);
+        return this;
+    }
+
+    /**
+     * Sets the fixed row height used by grid layout.
+     *
+     * @param gridRowHeight row height in scaled GUI pixels
+     * @return this style
+     */
+    public UiLayoutStyle gridRowHeight(int gridRowHeight) {
+        this.gridRowHeight = Math.max(0, gridRowHeight);
+        return this;
+    }
+
+    /**
+     * Stores stacking index metadata for future render ordering support.
+     *
+     * <p>The layout engine preserves this value but does not apply ordering.</p>
+     *
+     * @param zIndex stacking index metadata
+     * @return this style
+     */
+    public UiLayoutStyle zIndex(int zIndex) {
+        this.zIndex = zIndex;
         return this;
     }
 
@@ -242,10 +418,10 @@ public final class UiLayoutStyle {
     }
 
     /**
-     * Stores whether row/column wrapping is requested.
+     * Enables row wrapping for horizontal child layout.
      *
-     * <p>The current engine preserves the flag for API compatibility; wrapping
-     * behavior can be expanded without changing node declarations.</p>
+     * <p>When this flag is set on a row layout, children that would exceed the
+     * parent content width move to the next line.</p>
      *
      * @param wrap wrapping flag
      * @return this style
@@ -289,6 +465,87 @@ public final class UiLayoutStyle {
      */
     public UiSize preferredSize() {
         return new UiSize(width, height);
+    }
+
+    /**
+     * Returns the minimum resolved width.
+     *
+     * @return minimum width
+     */
+    public int minWidth() {
+        return minWidth;
+    }
+
+    /**
+     * Returns the minimum resolved height.
+     *
+     * @return minimum height
+     */
+    public int minHeight() {
+        return minHeight;
+    }
+
+    /**
+     * Returns the maximum resolved width.
+     *
+     * @return maximum width
+     */
+    public int maxWidth() {
+        return maxWidth;
+    }
+
+    /**
+     * Returns the maximum resolved height.
+     *
+     * @return maximum height
+     */
+    public int maxHeight() {
+        return maxHeight;
+    }
+
+    /**
+     * Returns the x offset from the parent content origin.
+     *
+     * @return x offset
+     */
+    public int x() {
+        return x;
+    }
+
+    /**
+     * Returns the y offset from the parent content origin.
+     *
+     * @return y offset
+     */
+    public int y() {
+        return y;
+    }
+
+    /**
+     * Returns the fixed grid column count.
+     *
+     * @return grid column count
+     */
+    public int gridColumns() {
+        return gridColumns;
+    }
+
+    /**
+     * Returns the fixed grid row height.
+     *
+     * @return grid row height
+     */
+    public int gridRowHeight() {
+        return gridRowHeight;
+    }
+
+    /**
+     * Returns stored stacking index metadata.
+     *
+     * @return z-index metadata
+     */
+    public int zIndex() {
+        return zIndex;
     }
 
     /**

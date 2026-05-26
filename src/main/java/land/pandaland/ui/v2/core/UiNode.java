@@ -4,10 +4,23 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import land.pandaland.ui.v2.components.UiCustomComponent;
+import land.pandaland.ui.v2.data.UiListItem;
+import land.pandaland.ui.v2.data.UiModalOptions;
+import land.pandaland.ui.v2.data.UiPage;
+import land.pandaland.ui.v2.data.UiRichTextSpan;
+import land.pandaland.ui.v2.data.UiTableColumn;
+import land.pandaland.ui.v2.data.UiTableRow;
+import land.pandaland.ui.v2.data.UiToastOptions;
+import land.pandaland.ui.v2.data.UiTooltipAttachment;
+import land.pandaland.ui.v2.data.UiTreeItem;
 import land.pandaland.ui.v2.event.UiDragHandler;
+import land.pandaland.ui.v2.event.UiSelectionHandler;
+import land.pandaland.ui.v2.event.UiShortcut;
 import land.pandaland.ui.v2.event.UiTextValidator;
 import land.pandaland.ui.v2.layout.UiLayoutStyle;
 import land.pandaland.ui.v2.layout.UiRect;
+import land.pandaland.ui.v2.render.UiCustomDraw;
 import land.pandaland.ui.v2.state.UiState;
 
 /**
@@ -61,7 +74,23 @@ public final class UiNode {
         /** Context menu panel. */
         CONTEXT_MENU,
         /** Form container used to group validated inputs. */
-        FORM
+        FORM,
+        /** Editable table-like collection with richer selection metadata. */
+        DATA_GRID,
+        /** Hierarchical tree selection control. */
+        TREE,
+        /** Rich text display control. */
+        RICH_TEXT,
+        /** Color value picker control. */
+        COLOR_PICKER,
+        /** Keyboard shortcut capture input. */
+        KEYBIND_INPUT,
+        /** Page stack container controlled by stable page ids. */
+        PAGE_STACK,
+        /** Renderer-independent canvas node backed by a custom draw hook. */
+        CANVAS,
+        /** Feature-owned custom component node. */
+        CUSTOM_COMPONENT
     }
 
     private final Type type;
@@ -76,6 +105,8 @@ public final class UiNode {
     private UiDragHandler dragHandler;
     private Runnable enterAction;
     private Runnable changeAction;
+    private UiSelectionHandler selectionHandler;
+    private final List<UiShortcut> shortcuts = new ArrayList<UiShortcut>();
 
     @SuppressWarnings("rawtypes")
     private UiState valueState;
@@ -100,11 +131,32 @@ public final class UiNode {
     private int horizontalScroll;
     private int maxLength = 256;
     private boolean password;
+    private boolean textArea;
+    private boolean numericInput;
+    private boolean searchInput;
+    private String inputMask = "";
     private UiTextValidator validator;
     private String validationMessage = "";
     private int scrollX;
     private int scrollY;
     private boolean open;
+    private int openX;
+    private int openY;
+    private List<UiListItem> items = Collections.emptyList();
+    private List<UiTableColumn> columns = Collections.emptyList();
+    private List<UiTableRow> rows = Collections.emptyList();
+    private List<UiTreeItem> treeItems = Collections.emptyList();
+    private List<UiRichTextSpan> spans = Collections.emptyList();
+    private List<UiPage> pages = Collections.emptyList();
+    private List<String> selectedIds = Collections.emptyList();
+    private boolean searchable;
+    private boolean multiSelect;
+    private boolean virtualized;
+    private UiModalOptions modalOptions;
+    private UiTooltipAttachment tooltipAttachment;
+    private UiToastOptions toastOptions;
+    private Object customComponent;
+    private UiCustomDraw customDraw;
 
     /**
      * Creates a node of the specified type.
@@ -267,6 +319,53 @@ public final class UiNode {
      */
     public Runnable changeAction() {
         return changeAction;
+    }
+
+    /**
+     * Sets the callback invoked after a selection-style control accepts a
+     * selected item.
+     *
+     * @param handler selection callback
+     * @return this node
+     */
+    public UiNode onSelection(UiSelectionHandler handler) {
+        this.selectionHandler = handler;
+        return this;
+    }
+
+    /**
+     * Returns the selection callback.
+     *
+     * @return selection callback or {@code null}
+     */
+    public UiSelectionHandler selectionHandler() {
+        return selectionHandler;
+    }
+
+    /**
+     * Registers a keyboard shortcut on this node.
+     *
+     * <p>Root-node shortcuts are checked by the runtime dispatcher after
+     * runtime shortcuts and before focused text input editing.</p>
+     *
+     * @param shortcut shortcut to register
+     * @return this node
+     */
+    public UiNode registerShortcut(UiShortcut shortcut) {
+        if (shortcut == null) {
+            throw new IllegalArgumentException("shortcut cannot be null");
+        }
+        shortcuts.add(shortcut);
+        return this;
+    }
+
+    /**
+     * Returns immutable keyboard shortcuts registered on this node.
+     *
+     * @return shortcut registrations
+     */
+    public List<UiShortcut> shortcuts() {
+        return Collections.unmodifiableList(shortcuts);
     }
 
     @SuppressWarnings("rawtypes")
@@ -697,6 +796,96 @@ public final class UiNode {
     }
 
     /**
+     * Reports whether this text input accepts multiple lines.
+     *
+     * @return textarea flag
+     */
+    public boolean textArea() {
+        return textArea;
+    }
+
+    /**
+     * Sets textarea metadata for a text input node.
+     *
+     * @param textArea textarea flag
+     * @return this node
+     */
+    public UiNode textArea(boolean textArea) {
+        this.textArea = textArea;
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Reports whether this text input should accept strict signed decimal text.
+     *
+     * @return numeric input flag
+     */
+    public boolean numericInput() {
+        return numericInput;
+    }
+
+    /**
+     * Sets numeric-input metadata for a text input node.
+     *
+     * <p>When enabled, the dispatcher accepts an optional leading sign, at most
+     * one decimal point, and digits in all other positions.</p>
+     *
+     * @param numericInput numeric input flag
+     * @return this node
+     */
+    public UiNode numericInput(boolean numericInput) {
+        this.numericInput = numericInput;
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Reports whether this text input represents a search field.
+     *
+     * @return search input flag
+     */
+    public boolean searchInput() {
+        return searchInput;
+    }
+
+    /**
+     * Sets search-input metadata for a text input node.
+     *
+     * @param searchInput search input flag
+     * @return this node
+     */
+    public UiNode searchInput(boolean searchInput) {
+        this.searchInput = searchInput;
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Returns optional input mask metadata for renderer or feature validation.
+     *
+     * @return input mask, never {@code null}
+     */
+    public String inputMask() {
+        return inputMask;
+    }
+
+    /**
+     * Sets optional input mask metadata for a text input node.
+     *
+     * <p>The core dispatcher stores this value but keeps existing text-input
+     * editing behavior unless another flag, such as numeric input, applies.</p>
+     *
+     * @param inputMask mask metadata, or {@code null} for no mask
+     * @return this node
+     */
+    public UiNode inputMask(String inputMask) {
+        this.inputMask = inputMask == null ? "" : inputMask;
+        invalidate();
+        return this;
+    }
+
+    /**
      * Returns text input validator.
      *
      * @return validator or {@code null}
@@ -805,5 +994,384 @@ public final class UiNode {
         this.open = open;
         invalidate();
         return this;
+    }
+
+    /**
+     * Opens this overlay-like node at a pointer position.
+     *
+     * <p>The position is renderer-independent metadata used by layout and event
+     * code for context menus and similar popups.</p>
+     *
+     * @param x open x coordinate in scaled GUI pixels
+     * @param y open y coordinate in scaled GUI pixels
+     * @return this node
+     */
+    public UiNode openAt(int x, int y) {
+        this.open = true;
+        this.openX = x;
+        this.openY = y;
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Returns the x coordinate captured when this node was opened.
+     *
+     * @return open x coordinate
+     */
+    public int openX() {
+        return openX;
+    }
+
+    /**
+     * Returns the y coordinate captured when this node was opened.
+     *
+     * @return open y coordinate
+     */
+    public int openY() {
+        return openY;
+    }
+
+    /**
+     * Returns immutable item metadata for list and select-like controls.
+     *
+     * @return item metadata, never {@code null}
+     */
+    public List<UiListItem> items() {
+        return items;
+    }
+
+    /**
+     * Sets item metadata for list and select-like controls.
+     *
+     * @param items item metadata
+     * @return this node
+     */
+    public UiNode items(List<UiListItem> items) {
+        this.items = copy(items);
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Returns immutable table column metadata.
+     *
+     * @return column metadata, never {@code null}
+     */
+    public List<UiTableColumn> columns() {
+        return columns;
+    }
+
+    /**
+     * Sets table column metadata.
+     *
+     * @param columns column metadata
+     * @return this node
+     */
+    public UiNode columns(List<UiTableColumn> columns) {
+        this.columns = copy(columns);
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Returns immutable table row metadata.
+     *
+     * @return row metadata, never {@code null}
+     */
+    public List<UiTableRow> rows() {
+        return rows;
+    }
+
+    /**
+     * Sets table row metadata.
+     *
+     * @param rows row metadata
+     * @return this node
+     */
+    public UiNode rows(List<UiTableRow> rows) {
+        this.rows = copy(rows);
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Returns immutable tree item metadata.
+     *
+     * @return tree item metadata, never {@code null}
+     */
+    public List<UiTreeItem> treeItems() {
+        return treeItems;
+    }
+
+    /**
+     * Sets tree item metadata.
+     *
+     * @param treeItems tree item metadata
+     * @return this node
+     */
+    public UiNode treeItems(List<UiTreeItem> treeItems) {
+        this.treeItems = copy(treeItems);
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Returns immutable rich text spans.
+     *
+     * @return rich text spans, never {@code null}
+     */
+    public List<UiRichTextSpan> spans() {
+        return spans;
+    }
+
+    /**
+     * Sets rich text spans.
+     *
+     * @param spans rich text spans
+     * @return this node
+     */
+    public UiNode spans(List<UiRichTextSpan> spans) {
+        this.spans = copy(spans);
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Returns immutable page descriptors.
+     *
+     * @return page descriptors, never {@code null}
+     */
+    public List<UiPage> pages() {
+        return pages;
+    }
+
+    /**
+     * Sets page descriptors.
+     *
+     * @param pages page descriptors
+     * @return this node
+     */
+    public UiNode pages(List<UiPage> pages) {
+        this.pages = copy(pages);
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Returns immutable selected ids for id-addressed controls.
+     *
+     * @return selected ids, never {@code null}
+     */
+    public List<String> selectedIds() {
+        return selectedIds;
+    }
+
+    /**
+     * Sets selected ids for id-addressed controls.
+     *
+     * @param selectedIds selected ids
+     * @return this node
+     */
+    public UiNode selectedIds(List<String> selectedIds) {
+        if (selectedIds == null || selectedIds.isEmpty()) {
+            this.selectedIds = Collections.emptyList();
+        } else {
+            List<String> copy = new ArrayList<String>(selectedIds.size());
+            for (String selectedId : selectedIds) {
+                copy.add(selectedId == null ? "" : selectedId);
+            }
+            this.selectedIds = Collections.unmodifiableList(copy);
+        }
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Reports whether a select-like control should expose searching.
+     *
+     * @return searchable flag
+     */
+    public boolean searchable() {
+        return searchable;
+    }
+
+    /**
+     * Sets searchable metadata.
+     *
+     * @param searchable searchable flag
+     * @return this node
+     */
+    public UiNode searchable(boolean searchable) {
+        this.searchable = searchable;
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Reports whether the control accepts multiple selected ids.
+     *
+     * @return multi-select flag
+     */
+    public boolean multiSelect() {
+        return multiSelect;
+    }
+
+    /**
+     * Sets multi-select metadata.
+     *
+     * @param multiSelect multi-select flag
+     * @return this node
+     */
+    public UiNode multiSelect(boolean multiSelect) {
+        this.multiSelect = multiSelect;
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Reports whether a collection node should be rendered virtually.
+     *
+     * @return virtualized flag
+     */
+    public boolean virtualized() {
+        return virtualized;
+    }
+
+    /**
+     * Sets virtualized metadata.
+     *
+     * @param virtualized virtualized flag
+     * @return this node
+     */
+    public UiNode virtualized(boolean virtualized) {
+        this.virtualized = virtualized;
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Returns modal overlay options.
+     *
+     * @return modal options or {@code null}
+     */
+    public UiModalOptions modalOptions() {
+        return modalOptions;
+    }
+
+    /**
+     * Stores modal overlay options.
+     *
+     * @param modalOptions modal options
+     * @return this node
+     */
+    public UiNode modalOptions(UiModalOptions modalOptions) {
+        this.modalOptions = modalOptions;
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Returns tooltip attachment metadata.
+     *
+     * @return attachment metadata or {@code null}
+     */
+    public UiTooltipAttachment tooltipAttachment() {
+        return tooltipAttachment;
+    }
+
+    /**
+     * Stores tooltip attachment metadata.
+     *
+     * @param tooltipAttachment tooltip attachment metadata
+     * @return this node
+     */
+    public UiNode tooltipAttachment(UiTooltipAttachment tooltipAttachment) {
+        this.tooltipAttachment = tooltipAttachment;
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Returns toast display options.
+     *
+     * @return toast options or {@code null}
+     */
+    public UiToastOptions toastOptions() {
+        return toastOptions;
+    }
+
+    /**
+     * Stores toast display options.
+     *
+     * @param toastOptions toast options
+     * @return this node
+     */
+    public UiNode toastOptions(UiToastOptions toastOptions) {
+        this.toastOptions = toastOptions;
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Returns an optional custom component placeholder.
+     *
+     * @return custom component object or {@code null}
+     */
+    public Object customComponent() {
+        return customComponent;
+    }
+
+    /**
+     * Returns the custom component hook when the raw compatibility slot stores one.
+     *
+     * @return typed custom component hook or {@code null}
+     */
+    public UiCustomComponent uiCustomComponent() {
+        return customComponent instanceof UiCustomComponent ? (UiCustomComponent) customComponent : null;
+    }
+
+    /**
+     * Stores an optional custom component hook.
+     *
+     * <p>Use {@link UiCustomComponent} for first-class build, render, and input
+     * callbacks. Existing {@link UiCustomDraw} instances are still accepted as a
+     * custom draw shorthand for compatibility.</p>
+     *
+     * @param customComponent custom component hook or draw placeholder
+     * @return this node
+     */
+    public UiNode customComponent(Object customComponent) {
+        this.customComponent = customComponent;
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Returns an optional custom draw hook.
+     *
+     * @return custom draw hook or {@code null}
+     */
+    public UiCustomDraw customDraw() {
+        return customDraw;
+    }
+
+    /**
+     * Stores an optional custom draw hook for canvas-like nodes.
+     *
+     * @param customDraw custom draw hook
+     * @return this node
+     */
+    public UiNode customDraw(UiCustomDraw customDraw) {
+        this.customDraw = customDraw;
+        invalidate();
+        return this;
+    }
+
+    private static <T> List<T> copy(List<T> source) {
+        if (source == null || source.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return Collections.unmodifiableList(new ArrayList<T>(source));
     }
 }

@@ -4,7 +4,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import land.pandaland.ui.v2.data.UiModalOptions;
+import land.pandaland.ui.v2.data.UiToastOptions;
 import land.pandaland.ui.v2.event.UiEventDispatcher;
+import land.pandaland.ui.v2.event.UiShortcut;
 import land.pandaland.ui.v2.layout.UiLayoutEngine;
 import land.pandaland.ui.v2.layout.UiLayoutStyle;
 import land.pandaland.ui.v2.layout.UiRect;
@@ -20,6 +23,7 @@ public final class UiRuntime {
     private final UiScreen screen;
     private final List<UiNode> modals = new ArrayList<UiNode>();
     private final List<UiNode> toasts = new ArrayList<UiNode>();
+    private final List<UiShortcut> shortcuts = new ArrayList<UiShortcut>();
     private final UiFocusManager focusManager = new UiFocusManager();
     private final UiEventDispatcher eventDispatcher;
     private UiRect lastBounds = new UiRect(0, 0, 0, 0);
@@ -76,6 +80,32 @@ public final class UiRuntime {
     }
 
     /**
+     * Registers a runtime-wide keyboard shortcut.
+     *
+     * <p>Runtime shortcuts are evaluated before root-node shortcuts and focused
+     * text input editing.</p>
+     *
+     * @param shortcut shortcut to register
+     * @return this runtime
+     */
+    public UiRuntime registerShortcut(UiShortcut shortcut) {
+        if (shortcut == null) {
+            throw new IllegalArgumentException("shortcut cannot be null");
+        }
+        shortcuts.add(shortcut);
+        return this;
+    }
+
+    /**
+     * Returns immutable runtime-wide shortcut registrations.
+     *
+     * @return registered shortcuts
+     */
+    public List<UiShortcut> shortcuts() {
+        return Collections.unmodifiableList(shortcuts);
+    }
+
+    /**
      * Applies layout to the root tree, active modals, and toasts.
      *
      * @param bounds available screen bounds in scaled GUI pixels
@@ -84,12 +114,14 @@ public final class UiRuntime {
         lastBounds = bounds == null ? new UiRect(0, 0, 0, 0) : bounds;
         layoutNode(screen.root(), lastBounds);
         for (UiNode modal : modals) {
-            layoutNode(modal, centered(lastBounds));
+            layoutNode(modal, centered(lastBounds, modal));
         }
         int toastY = 8;
         for (UiNode toast : toasts) {
-            layoutNode(toast, new UiRect(8, toastY, 160, 22));
-            toastY += 26;
+            int width = toast.toastOptions() == null ? 160 : toast.toastOptions().width();
+            int height = toast.toastOptions() == null ? 22 : toast.toastOptions().height();
+            layoutNode(toast, new UiRect(8, toastY, width, height));
+            toastY += height + 4;
         }
         screen.root().clearInvalid();
     }
@@ -130,7 +162,7 @@ public final class UiRuntime {
             throw new IllegalArgumentException("modal cannot be null");
         }
         modals.add(modal);
-        layoutNode(modal, centered(lastBounds));
+        layoutNode(modal, centered(lastBounds, modal));
     }
 
     /**
@@ -183,7 +215,21 @@ public final class UiRuntime {
      * @param durationMs lifetime in milliseconds
      */
     public void toast(String message, long durationMs) {
-        toasts.add(new UiNode(UiNode.Type.TOAST).layoutStyle(UiLayoutStyle.leaf().size(160, 22)).text(message).durationMs(durationMs));
+        toast(new UiToastOptions(message, durationMs));
+    }
+
+    /**
+     * Adds a toast notification with public display options.
+     *
+     * @param options toast options
+     */
+    public void toast(UiToastOptions options) {
+        UiToastOptions safeOptions = options == null ? new UiToastOptions("", 0L) : options;
+        toasts.add(new UiNode(UiNode.Type.TOAST)
+                .layoutStyle(UiLayoutStyle.leaf().size(safeOptions.width(), safeOptions.height()))
+                .text(safeOptions.message())
+                .durationMs(safeOptions.durationMs())
+                .toastOptions(safeOptions));
     }
 
     /**
@@ -220,14 +266,21 @@ public final class UiRuntime {
             if (node.type() == UiNode.Type.SCROLL_CONTAINER) {
                 childBounds = new UiRect(childBounds.x - node.scrollX(), childBounds.y - node.scrollY(), childBounds.width, childBounds.height);
             }
-            layoutNode(children.get(i), childBounds);
+            UiNode child = children.get(i);
+            if (child.type() == UiNode.Type.CONTEXT_MENU && child.open()) {
+                childBounds = new UiRect(child.openX(), child.openY(), childBounds.width, childBounds.height);
+            }
+            layoutNode(child, childBounds);
         }
     }
 
-    private static UiRect centered(UiRect bounds) {
+    private static UiRect centered(UiRect bounds, UiNode modal) {
         UiRect safeBounds = bounds == null ? new UiRect(0, 0, 0, 0) : bounds;
-        int width = Math.min(180, safeBounds.width);
-        int height = Math.min(90, safeBounds.height);
+        UiModalOptions options = modal == null ? null : modal.modalOptions();
+        int preferredWidth = options == null ? 180 : options.width();
+        int preferredHeight = options == null ? 90 : options.height();
+        int width = Math.min(preferredWidth, safeBounds.width);
+        int height = Math.min(preferredHeight, safeBounds.height);
         return new UiRect(safeBounds.x + (safeBounds.width - width) / 2, safeBounds.y + (safeBounds.height - height) / 2, width, height);
     }
 }
