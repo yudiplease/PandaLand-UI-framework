@@ -1,6 +1,7 @@
 package land.pandaland.ui.v2.render;
 
 import land.pandaland.ui.v2.layout.UiRect;
+import land.pandaland.ui.v2.minecraft.UiItemStackRef;
 import land.pandaland.ui.v2.style.UiColor;
 
 /**
@@ -66,7 +67,23 @@ public final class UiRenderCommand {
         /**
          * End a logical render layer.
          */
-        LAYER_END
+        LAYER_END,
+        /**
+         * Texture draw call with source UV metadata.
+         */
+        TEXTURE_REGION,
+        /**
+         * Stretchable nine-slice texture draw call.
+         */
+        NINE_SLICE,
+        /**
+         * Minecraft item stack draw call.
+         */
+        ITEM_STACK,
+        /**
+         * Minecraft item tooltip draw call.
+         */
+        ITEM_TOOLTIP
     }
 
     private final Type type;
@@ -90,6 +107,20 @@ public final class UiRenderCommand {
     private final UiCustomDraw customDraw;
     private final String layerName;
     private final int zIndex;
+    private final int u;
+    private final int v;
+    private final int regionWidth;
+    private final int regionHeight;
+    private final int textureWidth;
+    private final int textureHeight;
+    private final int sliceLeft;
+    private final int sliceTop;
+    private final int sliceRight;
+    private final int sliceBottom;
+    private final UiItemStackRef item;
+    private final UiRect anchorRect;
+    private final int mouseX;
+    private final int mouseY;
 
     private UiRenderCommand(
             Type type,
@@ -113,6 +144,48 @@ public final class UiRenderCommand {
             UiCustomDraw customDraw,
             String layerName,
             int zIndex) {
+        this(type, rect, color, endColor, text, texture, radius, amount,
+                thickness, blur, offsetX, offsetY, x1, y1, x2, y2, lineHeight,
+                vertical, customDraw, layerName, zIndex, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, UiItemStackRef.empty(), null, 0, 0);
+    }
+
+    private UiRenderCommand(
+            Type type,
+            UiRect rect,
+            UiColor color,
+            UiColor endColor,
+            String text,
+            String texture,
+            int radius,
+            float amount,
+            int thickness,
+            int blur,
+            int offsetX,
+            int offsetY,
+            int x1,
+            int y1,
+            int x2,
+            int y2,
+            int lineHeight,
+            boolean vertical,
+            UiCustomDraw customDraw,
+            String layerName,
+            int zIndex,
+            int u,
+            int v,
+            int regionWidth,
+            int regionHeight,
+            int textureWidth,
+            int textureHeight,
+            int sliceLeft,
+            int sliceTop,
+            int sliceRight,
+            int sliceBottom,
+            UiItemStackRef item,
+            UiRect anchorRect,
+            int mouseX,
+            int mouseY) {
         this.type = type;
         this.rect = rect;
         this.color = color;
@@ -134,6 +207,20 @@ public final class UiRenderCommand {
         this.customDraw = customDraw;
         this.layerName = layerName == null ? "" : layerName;
         this.zIndex = zIndex;
+        this.u = u;
+        this.v = v;
+        this.regionWidth = regionWidth;
+        this.regionHeight = regionHeight;
+        this.textureWidth = textureWidth;
+        this.textureHeight = textureHeight;
+        this.sliceLeft = sliceLeft;
+        this.sliceTop = sliceTop;
+        this.sliceRight = sliceRight;
+        this.sliceBottom = sliceBottom;
+        this.item = item == null ? UiItemStackRef.empty() : item;
+        this.anchorRect = anchorRect;
+        this.mouseX = mouseX;
+        this.mouseY = mouseY;
     }
 
     /**
@@ -169,6 +256,76 @@ public final class UiRenderCommand {
      */
     public static UiRenderCommand texture(String texture, UiRect rect) {
         return command(Type.TEXTURE, rect, null, null, "", texture, 0, 0.0F);
+    }
+
+    /**
+     * Creates a texture command with source UV metadata.
+     *
+     * @param texture texture resource id
+     * @param rect target rectangle
+     * @param u source u coordinate
+     * @param v source v coordinate
+     * @param regionWidth source region width
+     * @param regionHeight source region height
+     * @param textureWidth full texture width
+     * @param textureHeight full texture height
+     * @return render command
+     */
+    public static UiRenderCommand textureRegion(String texture, UiRect rect, int u, int v, int regionWidth, int regionHeight, int textureWidth, int textureHeight) {
+        return new UiRenderCommand(Type.TEXTURE_REGION, rect, null, null, "", texture, 0, 0.0F,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, true, null, "", 0,
+                u, v, regionWidth, regionHeight, textureWidth, textureHeight, 0, 0, 0, 0, UiItemStackRef.empty(), null, 0, 0);
+    }
+
+    /**
+     * Creates a nine-slice texture command.
+     *
+     * @param texture texture resource id
+     * @param rect target rectangle
+     * @param u source u coordinate
+     * @param v source v coordinate
+     * @param regionWidth source region width
+     * @param regionHeight source region height
+     * @param textureWidth full texture width
+     * @param textureHeight full texture height
+     * @param left left slice border
+     * @param top top slice border
+     * @param right right slice border
+     * @param bottom bottom slice border
+     * @return render command
+     */
+    public static UiRenderCommand nineSlice(String texture, UiRect rect, int u, int v, int regionWidth, int regionHeight, int textureWidth, int textureHeight, int left, int top, int right, int bottom) {
+        return new UiRenderCommand(Type.NINE_SLICE, rect, null, null, "", texture, 0, 0.0F,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, true, null, "", 0,
+                u, v, regionWidth, regionHeight, textureWidth, textureHeight, left, top, right, bottom, UiItemStackRef.empty(), null, 0, 0);
+    }
+
+    /**
+     * Creates an item stack draw command.
+     *
+     * @param item renderer-safe item reference
+     * @param rect target rectangle
+     * @return render command
+     */
+    public static UiRenderCommand itemStack(UiItemStackRef item, UiRect rect) {
+        return new UiRenderCommand(Type.ITEM_STACK, rect, null, null, "", "", 0, 0.0F,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, true, null, "", 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, item, null, 0, 0);
+    }
+
+    /**
+     * Creates an item tooltip command.
+     *
+     * @param item renderer-safe item reference
+     * @param anchor tooltip anchor rectangle
+     * @param mouseX mouse x coordinate
+     * @param mouseY mouse y coordinate
+     * @return render command
+     */
+    public static UiRenderCommand itemTooltip(UiItemStackRef item, UiRect anchor, int mouseX, int mouseY) {
+        return new UiRenderCommand(Type.ITEM_TOOLTIP, null, null, null, "", "", 0, 0.0F,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, true, null, "", 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, item, anchor, mouseX, mouseY);
     }
 
     /**
@@ -522,5 +679,131 @@ public final class UiRenderCommand {
      */
     public int zIndex() {
         return zIndex;
+    }
+
+    /**
+     * Returns texture source u coordinate.
+     *
+     * @return u coordinate
+     */
+    public int u() {
+        return u;
+    }
+
+    /**
+     * Returns texture source v coordinate.
+     *
+     * @return v coordinate
+     */
+    public int v() {
+        return v;
+    }
+
+    /**
+     * Returns texture source region width.
+     *
+     * @return region width
+     */
+    public int regionWidth() {
+        return regionWidth;
+    }
+
+    /**
+     * Returns texture source region height.
+     *
+     * @return region height
+     */
+    public int regionHeight() {
+        return regionHeight;
+    }
+
+    /**
+     * Returns full texture width.
+     *
+     * @return texture width
+     */
+    public int textureWidth() {
+        return textureWidth;
+    }
+
+    /**
+     * Returns full texture height.
+     *
+     * @return texture height
+     */
+    public int textureHeight() {
+        return textureHeight;
+    }
+
+    /**
+     * Returns left nine-slice border.
+     *
+     * @return left border
+     */
+    public int sliceLeft() {
+        return sliceLeft;
+    }
+
+    /**
+     * Returns top nine-slice border.
+     *
+     * @return top border
+     */
+    public int sliceTop() {
+        return sliceTop;
+    }
+
+    /**
+     * Returns right nine-slice border.
+     *
+     * @return right border
+     */
+    public int sliceRight() {
+        return sliceRight;
+    }
+
+    /**
+     * Returns bottom nine-slice border.
+     *
+     * @return bottom border
+     */
+    public int sliceBottom() {
+        return sliceBottom;
+    }
+
+    /**
+     * Returns item stack reference.
+     *
+     * @return item reference, or empty item reference
+     */
+    public UiItemStackRef item() {
+        return item;
+    }
+
+    /**
+     * Returns tooltip anchor rectangle.
+     *
+     * @return anchor rectangle, or {@code null}
+     */
+    public UiRect anchorRect() {
+        return anchorRect;
+    }
+
+    /**
+     * Returns mouse x coordinate for tooltip commands.
+     *
+     * @return mouse x coordinate
+     */
+    public int mouseX() {
+        return mouseX;
+    }
+
+    /**
+     * Returns mouse y coordinate for tooltip commands.
+     *
+     * @return mouse y coordinate
+     */
+    public int mouseY() {
+        return mouseY;
     }
 }

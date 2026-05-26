@@ -9,6 +9,9 @@ import land.pandaland.ui.v2.data.UiTableColumn;
 import land.pandaland.ui.v2.data.UiTableRow;
 import land.pandaland.ui.v2.data.UiTreeItem;
 import land.pandaland.ui.v2.layout.UiRect;
+import land.pandaland.ui.v2.minecraft.UiInventoryGrid;
+import land.pandaland.ui.v2.minecraft.UiItemStackRef;
+import land.pandaland.ui.v2.minecraft.UiSlotBinding;
 import land.pandaland.ui.v2.style.UiColor;
 import land.pandaland.ui.v2.style.UiTheme;
 
@@ -27,6 +30,19 @@ public final class UiRenderTraversal {
      * @return render commands in draw order
      */
     public static UiRenderList render(UiRuntime runtime, UiTheme theme) {
+        return render(runtime, theme, Integer.MIN_VALUE, Integer.MIN_VALUE);
+    }
+
+    /**
+     * Builds the render command list using the current mouse position for hover-only commands.
+     *
+     * @param runtime runtime to render
+     * @param theme visual theme
+     * @param mouseX mouse x coordinate in scaled GUI pixels
+     * @param mouseY mouse y coordinate in scaled GUI pixels
+     * @return render commands in draw order
+     */
+    public static UiRenderList render(UiRuntime runtime, UiTheme theme, int mouseX, int mouseY) {
         if (runtime == null) {
             throw new IllegalArgumentException("runtime cannot be null");
         }
@@ -35,30 +51,41 @@ public final class UiRenderTraversal {
         }
 
         UiRenderList commands = new UiRenderList();
+        UiRenderList tooltips = new UiRenderList();
         UiNode focused = runtime.focus().focused();
 
-        renderNode(commands, runtime.screen().root(), theme, focused, runtime.elapsedMs());
+        renderNode(commands, tooltips, runtime.screen().root(), theme, focused, runtime.elapsedMs(), mouseX, mouseY);
 
         int modalIndex = 0;
         for (UiNode modal : runtime.modals()) {
+            if (coversMouse(modal.bounds(), mouseX, mouseY)) {
+                tooltips = new UiRenderList();
+            }
             commands.add(UiRenderCommand.layerStart("modal", 1000 + modalIndex));
-            renderNode(commands, modal, theme, focused, runtime.elapsedMs());
+            renderNode(commands, tooltips, modal, theme, focused, runtime.elapsedMs(), mouseX, mouseY);
             commands.add(UiRenderCommand.layerEnd("modal"));
             modalIndex++;
         }
 
         int toastIndex = 0;
         for (UiNode toast : runtime.toasts()) {
+            if (coversMouse(toast.bounds(), mouseX, mouseY)) {
+                tooltips = new UiRenderList();
+            }
             commands.add(UiRenderCommand.layerStart("toast", 2000 + toastIndex));
-            renderNode(commands, toast, theme, focused, runtime.elapsedMs());
+            renderNode(commands, tooltips, toast, theme, focused, runtime.elapsedMs(), mouseX, mouseY);
             commands.add(UiRenderCommand.layerEnd("toast"));
             toastIndex++;
+        }
+
+        for (UiRenderCommand tooltip : tooltips.commands()) {
+            commands.add(tooltip);
         }
 
         return commands;
     }
 
-    private static void renderNode(UiRenderList commands, UiNode node, UiTheme theme, UiNode focused, long elapsedMs) {
+    private static void renderNode(UiRenderList commands, UiRenderList tooltips, UiNode node, UiTheme theme, UiNode focused, long elapsedMs, int mouseX, int mouseY) {
         if (node == null || !node.visible()) {
             return;
         }
@@ -114,6 +141,14 @@ public final class UiRenderTraversal {
             commands.add(UiRenderCommand.border(node.bounds(), theme.panelRadius(), theme.primaryAccent(), 1));
         } else if (node.type() == UiNode.Type.CANVAS) {
             commands.add(UiRenderCommand.border(node.bounds(), 1, theme.textMuted(), 1));
+        } else if (node.type() == UiNode.Type.ITEM) {
+            renderItem(commands, tooltips, node.itemStack(), node.bounds(), mouseX, mouseY);
+        } else if (node.type() == UiNode.Type.SLOT) {
+            renderSlot(commands, tooltips, node.bounds(), slotItem(node), theme, mouseX, mouseY, false);
+        } else if (node.type() == UiNode.Type.INVENTORY_GRID) {
+            renderInventoryGrid(commands, tooltips, node, theme, mouseX, mouseY);
+        } else if (node.type() == UiNode.Type.HOTBAR) {
+            renderHotbar(commands, tooltips, node, theme, mouseX, mouseY);
         } else if (node.type() == UiNode.Type.CUSTOM_COMPONENT) {
             if (node.customComponent() instanceof UiCustomComponent) {
                 UiCustomComponent component = (UiCustomComponent) node.customComponent();
@@ -151,7 +186,7 @@ public final class UiRenderTraversal {
 
         if (!rendersOwnChildren(node)) {
             for (UiNode child : node.children()) {
-                renderNode(commands, child, theme, focused, elapsedMs);
+                renderNode(commands, tooltips, child, theme, focused, elapsedMs, mouseX, mouseY);
             }
         }
 
@@ -162,6 +197,68 @@ public final class UiRenderTraversal {
 
     private static boolean rendersOwnChildren(UiNode node) {
         return node.type() == UiNode.Type.LIST || node.type() == UiNode.Type.SELECT;
+    }
+
+    private static boolean coversMouse(UiRect overlayBounds, int mouseX, int mouseY) {
+        return overlayBounds != null && overlayBounds.contains(mouseX, mouseY);
+    }
+
+    private static void renderInventoryGrid(UiRenderList commands, UiRenderList tooltips, UiNode node, UiTheme theme, int mouseX, int mouseY) {
+        UiInventoryGrid grid = node.inventoryGrid();
+        if (grid == null) {
+            return;
+        }
+
+        int maxSlots = grid.columns() * grid.rows();
+        for (int index = 0; index < maxSlots; index++) {
+            int column = index % grid.columns();
+            int row = index / grid.columns();
+            UiRect slotRect = new UiRect(
+                    node.bounds().x + column * (grid.slotSize() + grid.gap()),
+                    node.bounds().y + row * (grid.slotSize() + grid.gap()),
+                    grid.slotSize(),
+                    grid.slotSize()
+            );
+            UiItemStackRef item = index < grid.slots().size() ? grid.slots().get(index).item() : UiItemStackRef.empty();
+            renderSlot(commands, tooltips, slotRect, item, theme, mouseX, mouseY, false);
+        }
+    }
+
+    private static void renderHotbar(UiRenderList commands, UiRenderList tooltips, UiNode node, UiTheme theme, int mouseX, int mouseY) {
+        int slotSize = node.bounds().height > 0 ? node.bounds().height : 18;
+        int slotCount = node.slotBindings().isEmpty() ? Math.max(1, node.bounds().width / Math.max(1, slotSize)) : node.slotBindings().size();
+        for (int index = 0; index < slotCount; index++) {
+            UiSlotBinding slot = index < node.slotBindings().size() ? node.slotBindings().get(index) : null;
+            UiRect slotRect = new UiRect(node.bounds().x + index * slotSize, node.bounds().y, slotSize, slotSize);
+            UiItemStackRef item = slot == null ? UiItemStackRef.empty() : slot.item();
+            renderSlot(commands, tooltips, slotRect, item, theme, mouseX, mouseY, index == node.selectedIndex());
+        }
+    }
+
+    private static void renderSlot(UiRenderList commands, UiRenderList tooltips, UiRect bounds, UiItemStackRef item, UiTheme theme, int mouseX, int mouseY, boolean selected) {
+        commands.add(UiRenderCommand.roundedRect(bounds, theme.buttonRadius(), theme.buttonBase()));
+        if (selected) {
+            commands.add(UiRenderCommand.border(bounds, theme.buttonRadius(), theme.primaryAccent(), 1));
+        }
+        renderItem(commands, tooltips, item, bounds, mouseX, mouseY);
+    }
+
+    private static void renderItem(UiRenderList commands, UiRenderList tooltips, UiItemStackRef item, UiRect bounds, int mouseX, int mouseY) {
+        if (item == null || item.isEmpty()) {
+            return;
+        }
+        commands.add(UiRenderCommand.itemStack(item, bounds));
+        if (bounds.contains(mouseX, mouseY)) {
+            tooltips.add(UiRenderCommand.itemTooltip(item, bounds, mouseX, mouseY));
+        }
+    }
+
+    private static UiItemStackRef slotItem(UiNode node) {
+        UiSlotBinding binding = node.slotBinding();
+        if (binding != null) {
+            return binding.item();
+        }
+        return node.itemStack();
     }
 
     private static void renderSelect(UiRenderList commands, UiNode node, UiTheme theme) {

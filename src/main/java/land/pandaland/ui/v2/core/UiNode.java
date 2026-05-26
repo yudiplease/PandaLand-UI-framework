@@ -20,6 +20,10 @@ import land.pandaland.ui.v2.event.UiShortcut;
 import land.pandaland.ui.v2.event.UiTextValidator;
 import land.pandaland.ui.v2.layout.UiLayoutStyle;
 import land.pandaland.ui.v2.layout.UiRect;
+import land.pandaland.ui.v2.minecraft.UiAnchor;
+import land.pandaland.ui.v2.minecraft.UiInventoryGrid;
+import land.pandaland.ui.v2.minecraft.UiItemStackRef;
+import land.pandaland.ui.v2.minecraft.UiSlotBinding;
 import land.pandaland.ui.v2.render.UiCustomDraw;
 import land.pandaland.ui.v2.state.UiState;
 
@@ -90,7 +94,15 @@ public final class UiNode {
         /** Renderer-independent canvas node backed by a custom draw hook. */
         CANVAS,
         /** Feature-owned custom component node. */
-        CUSTOM_COMPONENT
+        CUSTOM_COMPONENT,
+        /** Renderer-independent Minecraft item stack display. */
+        ITEM,
+        /** Minecraft inventory slot display and metadata. */
+        SLOT,
+        /** Minecraft inventory slot grid display. */
+        INVENTORY_GRID,
+        /** Minecraft hotbar slot strip display. */
+        HOTBAR
     }
 
     private final Type type;
@@ -157,6 +169,13 @@ public final class UiNode {
     private UiToastOptions toastOptions;
     private Object customComponent;
     private UiCustomDraw customDraw;
+    private UiItemStackRef itemStack = UiItemStackRef.empty();
+    private UiSlotBinding slotBinding;
+    private UiInventoryGrid inventoryGrid;
+    private List<UiSlotBinding> slotBindings = Collections.emptyList();
+    private int selectedIndex;
+    private UiAnchor anchor;
+    private boolean snapToPixel;
 
     /**
      * Creates a node of the specified type.
@@ -1368,10 +1387,170 @@ public final class UiNode {
         return this;
     }
 
+    /**
+     * Returns item stack metadata for Minecraft item nodes.
+     *
+     * @return item stack metadata, never {@code null}
+     */
+    public UiItemStackRef itemStack() {
+        return itemStack;
+    }
+
+    /**
+     * Stores item stack metadata for Minecraft item nodes.
+     *
+     * @param itemStack item stack metadata, or {@code null} for empty
+     * @return this node
+     */
+    public UiNode itemStack(UiItemStackRef itemStack) {
+        this.itemStack = itemStack == null ? UiItemStackRef.empty() : itemStack;
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Returns slot binding metadata for Minecraft slot nodes.
+     *
+     * @return slot binding or {@code null}
+     */
+    public UiSlotBinding slotBinding() {
+        return slotBinding;
+    }
+
+    /**
+     * Stores slot binding metadata for Minecraft slot nodes.
+     *
+     * @param slotBinding slot binding metadata
+     * @return this node
+     */
+    public UiNode slotBinding(UiSlotBinding slotBinding) {
+        this.slotBinding = slotBinding;
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Returns inventory grid metadata.
+     *
+     * @return inventory grid or {@code null}
+     */
+    public UiInventoryGrid inventoryGrid() {
+        return inventoryGrid;
+    }
+
+    /**
+     * Stores inventory grid metadata.
+     *
+     * @param inventoryGrid inventory grid metadata
+     * @return this node
+     */
+    public UiNode inventoryGrid(UiInventoryGrid inventoryGrid) {
+        this.inventoryGrid = inventoryGrid;
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Returns immutable slot binding metadata for grouped slot nodes.
+     *
+     * @return slot bindings, never {@code null}
+     */
+    public List<UiSlotBinding> slotBindings() {
+        return slotBindings;
+    }
+
+    /**
+     * Stores slot binding metadata for grouped slot nodes.
+     *
+     * @param slotBindings slot binding metadata
+     * @return this node
+     */
+    public UiNode slotBindings(List<UiSlotBinding> slotBindings) {
+        this.slotBindings = copySlots(slotBindings);
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Returns selected slot index metadata.
+     *
+     * @return selected slot index
+     */
+    public int selectedIndex() {
+        return selectedIndex;
+    }
+
+    /**
+     * Stores selected slot index metadata.
+     *
+     * @param selectedIndex selected slot index
+     * @return this node
+     */
+    public UiNode selectedIndex(int selectedIndex) {
+        this.selectedIndex = Math.max(0, selectedIndex);
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Returns Minecraft-aware anchor metadata.
+     *
+     * @return anchor or {@code null}
+     */
+    public UiAnchor anchor() {
+        return anchor;
+    }
+
+    /**
+     * Stores Minecraft-aware anchor metadata.
+     *
+     * @param anchor anchor metadata
+     * @return this node
+     */
+    public UiNode anchor(UiAnchor anchor) {
+        this.anchor = anchor;
+        invalidate();
+        return this;
+    }
+
+    /**
+     * Reports whether layout should snap this node to whole pixels.
+     *
+     * @return snap-to-pixel flag
+     */
+    public boolean snapToPixel() {
+        return snapToPixel;
+    }
+
+    /**
+     * Stores snap-to-pixel metadata.
+     *
+     * @param snapToPixel snap-to-pixel flag
+     * @return this node
+     */
+    public UiNode snapToPixel(boolean snapToPixel) {
+        this.snapToPixel = snapToPixel;
+        invalidate();
+        return this;
+    }
+
     private static <T> List<T> copy(List<T> source) {
         if (source == null || source.isEmpty()) {
             return Collections.emptyList();
         }
         return Collections.unmodifiableList(new ArrayList<T>(source));
+    }
+
+    private static List<UiSlotBinding> copySlots(List<UiSlotBinding> source) {
+        if (source == null || source.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<UiSlotBinding> copy = new ArrayList<UiSlotBinding>();
+        for (UiSlotBinding slot : source) {
+            if (slot != null) {
+                copy.add(slot);
+            }
+        }
+        return copy.isEmpty() ? Collections.<UiSlotBinding>emptyList() : Collections.unmodifiableList(copy);
     }
 }

@@ -11,6 +11,8 @@ import land.pandaland.ui.v2.event.UiShortcut;
 import land.pandaland.ui.v2.layout.UiLayoutEngine;
 import land.pandaland.ui.v2.layout.UiLayoutStyle;
 import land.pandaland.ui.v2.layout.UiRect;
+import land.pandaland.ui.v2.layout.UiSize;
+import land.pandaland.ui.v2.minecraft.UiAnchor;
 
 /**
  * Runtime state for an opened retained UI screen.
@@ -270,8 +272,47 @@ public final class UiRuntime {
             if (child.type() == UiNode.Type.CONTEXT_MENU && child.open()) {
                 childBounds = new UiRect(child.openX(), child.openY(), childBounds.width, childBounds.height);
             }
+            childBounds = applyAnchor(child, childBounds, lastBounds);
             layoutNode(child, childBounds);
         }
+    }
+
+    private static UiRect applyAnchor(UiNode node, UiRect current, UiRect parentBounds) {
+        if (node == null || current == null) {
+            return current == null ? new UiRect(0, 0, 0, 0) : current;
+        }
+        UiRect result = current;
+        UiAnchor anchor = node.anchor();
+        if (anchor != null) {
+            UiRect parent = parentBounds == null ? new UiRect(0, 0, 0, 0) : parentBounds;
+            UiSize preferred = node.layoutStyle().preferredSize();
+            int width = preferred.width > 0 ? preferred.width : current.width;
+            int height = preferred.height > 0 ? preferred.height : current.height;
+            int x = current.x;
+            int y = current.y;
+            if (anchor == UiAnchor.CENTER || anchor == UiAnchor.INVENTORY_CENTER) {
+                x = parent.x + (parent.width - width) / 2;
+                y = parent.y + (parent.height - height) / 2;
+            } else if (anchor == UiAnchor.HOTBAR) {
+                x = parent.x + (parent.width - width) / 2;
+                y = parent.y + parent.height - height - 22;
+            } else if (anchor == UiAnchor.TOP_CENTER) {
+                x = parent.x + (parent.width - width) / 2;
+                y = parent.y;
+            } else if (anchor == UiAnchor.BOTTOM_CENTER) {
+                x = parent.x + (parent.width - width) / 2;
+                y = parent.y + parent.height - height;
+            } else if (anchor == UiAnchor.TOP_LEFT) {
+                x = parent.x;
+                y = parent.y;
+            }
+            result = new UiRect(x + node.layoutStyle().x(), y + node.layoutStyle().y(), width, height);
+        }
+        return node.snapToPixel() ? snapToPixel(result) : result;
+    }
+
+    private static UiRect snapToPixel(UiRect rect) {
+        return new UiRect(Math.round(rect.x), Math.round(rect.y), Math.round(rect.width), Math.round(rect.height));
     }
 
     private static UiRect centered(UiRect bounds, UiNode modal) {

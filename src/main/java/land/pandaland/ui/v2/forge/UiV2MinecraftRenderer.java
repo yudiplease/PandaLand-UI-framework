@@ -12,26 +12,38 @@ import land.pandaland.ui.v2.render.UiRenderList;
 import land.pandaland.ui.v2.render.UiRenderTraversal;
 import land.pandaland.ui.v2.style.UiTheme;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.renderer.RenderHelper;
+import net.minecraft.client.renderer.entity.RenderItem;
+import net.minecraft.item.ItemStack;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL12;
 
 @SideOnly(Side.CLIENT)
-public final class UiV2MinecraftRenderer extends Gui {
+public final class UiV2MinecraftRenderer extends GuiScreen {
     private final Minecraft minecraft;
     private final UiTheme theme = UiTheme.pandalandDefault();
     private final List<UiRect> clipStack = new ArrayList<UiRect>();
 
     public UiV2MinecraftRenderer(Minecraft minecraft) {
+        if (minecraft == null) {
+            throw new IllegalArgumentException("minecraft cannot be null");
+        }
         this.minecraft = minecraft;
+        this.mc = minecraft;
+        this.fontRendererObj = minecraft.fontRenderer;
+        ScaledResolution resolution = new ScaledResolution(minecraft, minecraft.displayWidth, minecraft.displayHeight);
+        this.width = resolution.getScaledWidth();
+        this.height = resolution.getScaledHeight();
     }
 
     public void render(UiRuntime runtime) {
-        resetClipState();
         GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
         GL11.glPushMatrix();
         try {
+            resetClipState();
             UiRenderList commands = UiRenderTraversal.render(runtime, theme);
             for (UiRenderCommand command : commands.commands()) {
                 draw(command);
@@ -44,6 +56,9 @@ public final class UiV2MinecraftRenderer extends Gui {
     }
 
     private void draw(UiRenderCommand command) {
+        if (command == null || command.type() == null) {
+            return;
+        }
         if (command.type() == UiRenderCommand.Type.ROUNDED_RECT) {
             UiRect rect = command.rect();
             drawRoundedRect(rect.x, rect.y, rect.x + rect.width, rect.y + rect.height, command.radius(), command.color().argb());
@@ -54,6 +69,14 @@ public final class UiV2MinecraftRenderer extends Gui {
             UiRect rect = command.rect();
             minecraft.getTextureManager().bindTexture(new ResourceLocation(command.texture()));
             drawTexturedModalRect(rect.x, rect.y, 0, 0, rect.width, rect.height);
+        } else if (command.type() == UiRenderCommand.Type.TEXTURE_REGION) {
+            drawTextureRegion(command);
+        } else if (command.type() == UiRenderCommand.Type.NINE_SLICE) {
+            drawNineSlice(command);
+        } else if (command.type() == UiRenderCommand.Type.ITEM_STACK) {
+            drawItemStack(command);
+        } else if (command.type() == UiRenderCommand.Type.ITEM_TOOLTIP) {
+            drawItemTooltip(command);
         } else if (command.type() == UiRenderCommand.Type.CLIP_START) {
             beginClip(command.rect());
         } else if (command.type() == UiRenderCommand.Type.CLIP_END) {
@@ -78,6 +101,128 @@ public final class UiV2MinecraftRenderer extends Gui {
                 || command.type() == UiRenderCommand.Type.LAYER_END) {
             // Forge 1.7.10 fallback renderer preserves these commands as safe no-ops.
         }
+    }
+
+    private void drawTextureRegion(UiRenderCommand command) {
+        UiRect rect = command.rect();
+        if (rect == null || rect.width <= 0 || rect.height <= 0 || command.texture().isEmpty()) {
+            return;
+        }
+        UiV2RenderSupport.UvRegion region = UiV2RenderSupport.textureRegion(
+                command.u(),
+                command.v(),
+                command.regionWidth(),
+                command.regionHeight(),
+                command.textureWidth(),
+                command.textureHeight());
+        if (!region.valid()) {
+            return;
+        }
+        minecraft.getTextureManager().bindTexture(new ResourceLocation(command.texture()));
+        drawTexturePart(rect.x, rect.y, rect.width, rect.height, region.u(), region.v(), region.width(), region.height(), region.textureWidth(), region.textureHeight());
+    }
+
+    private void drawNineSlice(UiRenderCommand command) {
+        if (command.texture().isEmpty()) {
+            return;
+        }
+        UiV2RenderSupport.NineSlice slice = UiV2RenderSupport.nineSlice(
+                command.rect(),
+                command.u(),
+                command.v(),
+                command.regionWidth(),
+                command.regionHeight(),
+                command.textureWidth(),
+                command.textureHeight(),
+                command.sliceLeft(),
+                command.sliceTop(),
+                command.sliceRight(),
+                command.sliceBottom());
+        if (!slice.valid()) {
+            return;
+        }
+        minecraft.getTextureManager().bindTexture(new ResourceLocation(command.texture()));
+        drawNineSlicePart(slice, 0, 0, slice.targetLeft(), slice.targetTop(), 0, 0, slice.sourceLeft(), slice.sourceTop());
+        drawNineSlicePart(slice, slice.targetLeft(), 0, centerWidth(slice), slice.targetTop(), slice.sourceLeft(), 0, sourceCenterWidth(slice), slice.sourceTop());
+        drawNineSlicePart(slice, slice.target().width - slice.targetRight(), 0, slice.targetRight(), slice.targetTop(), slice.sourceWidth() - slice.sourceRight(), 0, slice.sourceRight(), slice.sourceTop());
+        drawNineSlicePart(slice, 0, slice.targetTop(), slice.targetLeft(), centerHeight(slice), 0, slice.sourceTop(), slice.sourceLeft(), sourceCenterHeight(slice));
+        drawNineSlicePart(slice, slice.targetLeft(), slice.targetTop(), centerWidth(slice), centerHeight(slice), slice.sourceLeft(), slice.sourceTop(), sourceCenterWidth(slice), sourceCenterHeight(slice));
+        drawNineSlicePart(slice, slice.target().width - slice.targetRight(), slice.targetTop(), slice.targetRight(), centerHeight(slice), slice.sourceWidth() - slice.sourceRight(), slice.sourceTop(), slice.sourceRight(), sourceCenterHeight(slice));
+        drawNineSlicePart(slice, 0, slice.target().height - slice.targetBottom(), slice.targetLeft(), slice.targetBottom(), 0, slice.sourceHeight() - slice.sourceBottom(), slice.sourceLeft(), slice.sourceBottom());
+        drawNineSlicePart(slice, slice.targetLeft(), slice.target().height - slice.targetBottom(), centerWidth(slice), slice.targetBottom(), slice.sourceLeft(), slice.sourceHeight() - slice.sourceBottom(), sourceCenterWidth(slice), slice.sourceBottom());
+        drawNineSlicePart(slice, slice.target().width - slice.targetRight(), slice.target().height - slice.targetBottom(), slice.targetRight(), slice.targetBottom(), slice.sourceWidth() - slice.sourceRight(), slice.sourceHeight() - slice.sourceBottom(), slice.sourceRight(), slice.sourceBottom());
+    }
+
+    private void drawNineSlicePart(UiV2RenderSupport.NineSlice slice, int targetX, int targetY, int targetWidth, int targetHeight, int sourceX, int sourceY, int sourceWidth, int sourceHeight) {
+        if (targetWidth <= 0 || targetHeight <= 0 || sourceWidth <= 0 || sourceHeight <= 0) {
+            return;
+        }
+        drawTexturePart(
+                slice.target().x + targetX,
+                slice.target().y + targetY,
+                targetWidth,
+                targetHeight,
+                slice.sourceU() + sourceX,
+                slice.sourceV() + sourceY,
+                sourceWidth,
+                sourceHeight,
+                slice.textureWidth(),
+                slice.textureHeight());
+    }
+
+    private static int centerWidth(UiV2RenderSupport.NineSlice slice) {
+        return Math.max(0, slice.target().width - slice.targetLeft() - slice.targetRight());
+    }
+
+    private static int centerHeight(UiV2RenderSupport.NineSlice slice) {
+        return Math.max(0, slice.target().height - slice.targetTop() - slice.targetBottom());
+    }
+
+    private static int sourceCenterWidth(UiV2RenderSupport.NineSlice slice) {
+        return Math.max(0, slice.sourceWidth() - slice.sourceLeft() - slice.sourceRight());
+    }
+
+    private static int sourceCenterHeight(UiV2RenderSupport.NineSlice slice) {
+        return Math.max(0, slice.sourceHeight() - slice.sourceTop() - slice.sourceBottom());
+    }
+
+    private static void drawTexturePart(int x, int y, int targetWidth, int targetHeight, int u, int v, int sourceWidth, int sourceHeight, int textureWidth, int textureHeight) {
+        func_152125_a(x, y, u, v, sourceWidth, sourceHeight, targetWidth, targetHeight, textureWidth, textureHeight);
+    }
+
+    private void drawItemStack(UiRenderCommand command) {
+        if (UiV2RenderSupport.classifyItem(command.item()) != UiV2RenderSupport.ItemCommandKind.ITEMSTACK) {
+            return;
+        }
+        UiRect rect = command.rect();
+        if (rect == null || rect.width <= 0 || rect.height <= 0) {
+            return;
+        }
+        ItemStack stack = (ItemStack) command.item().rawStack();
+        if (stack == null || stack.getItem() == null || stack.stackSize <= 0) {
+            return;
+        }
+        try {
+            RenderItem itemRenderer = RenderItem.getInstance();
+            GL11.glEnable(GL12.GL_RESCALE_NORMAL);
+            RenderHelper.enableGUIStandardItemLighting();
+            itemRenderer.renderItemAndEffectIntoGUI(minecraft.fontRenderer, minecraft.getTextureManager(), stack, rect.x, rect.y);
+            itemRenderer.renderItemOverlayIntoGUI(minecraft.fontRenderer, minecraft.getTextureManager(), stack, rect.x, rect.y);
+        } finally {
+            RenderHelper.disableStandardItemLighting();
+            GL11.glDisable(GL12.GL_RESCALE_NORMAL);
+        }
+    }
+
+    private void drawItemTooltip(UiRenderCommand command) {
+        if (UiV2RenderSupport.classifyItem(command.item()) != UiV2RenderSupport.ItemCommandKind.ITEMSTACK) {
+            return;
+        }
+        ItemStack stack = (ItemStack) command.item().rawStack();
+        if (stack == null || stack.getItem() == null || stack.stackSize <= 0) {
+            return;
+        }
+        drawHoveringText(stack.getTooltip(minecraft.thePlayer, minecraft.gameSettings.advancedItemTooltips), command.mouseX(), command.mouseY(), minecraft.fontRenderer);
     }
 
     private static void drawBorder(UiRect rect, int thickness, int color) {

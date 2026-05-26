@@ -22,6 +22,10 @@ import land.pandaland.ui.v2.event.UiSelectionHandler;
 import land.pandaland.ui.v2.event.UiTextValidator;
 import land.pandaland.ui.v2.state.UiState;
 import land.pandaland.ui.v2.render.UiCustomDraw;
+import land.pandaland.ui.v2.minecraft.UiAnchor;
+import land.pandaland.ui.v2.minecraft.UiInventoryGrid;
+import land.pandaland.ui.v2.minecraft.UiItemStackRef;
+import land.pandaland.ui.v2.minecraft.UiSlotBinding;
 
 /**
  * Public fluent entry point for PandaLand UI Framework v2 screens.
@@ -629,6 +633,94 @@ public final class Ui {
          */
         public NodeBuilder offset(int x, int y) {
             node.layoutStyle().offset(x, y);
+            return this;
+        }
+
+        /**
+         * Adds a Minecraft item stack display node.
+         *
+         * @param item item stack metadata, or {@code null} for empty
+         * @param width item node width
+         * @param height item node height
+         * @return this builder
+         */
+        public NodeBuilder item(UiItemStackRef item, int width, int height) {
+            node.add(new UiNode(UiNode.Type.ITEM)
+                    .layoutStyle(UiLayoutStyle.leaf().size(width, height))
+                    .itemStack(item));
+            return this;
+        }
+
+        /**
+         * Adds a Minecraft slot node.
+         *
+         * @param slot slot binding metadata
+         * @param size slot width and height
+         * @return this builder
+         */
+        public NodeBuilder slot(UiSlotBinding slot, int size) {
+            node.add(new UiNode(UiNode.Type.SLOT)
+                    .layoutStyle(UiLayoutStyle.leaf().size(size, size))
+                    .slotBinding(slot));
+            return this;
+        }
+
+        /**
+         * Adds a Minecraft inventory grid node.
+         *
+         * @param grid inventory grid metadata
+         * @return this builder
+         */
+        public NodeBuilder inventoryGrid(UiInventoryGrid grid) {
+            int columns = grid == null ? 1 : grid.columns();
+            int rows = grid == null ? 1 : grid.rows();
+            int slotSize = grid == null ? 18 : grid.slotSize();
+            int gap = grid == null ? 0 : grid.gap();
+            int width = columns * slotSize + Math.max(0, columns - 1) * gap;
+            int height = rows * slotSize + Math.max(0, rows - 1) * gap;
+            node.add(new UiNode(UiNode.Type.INVENTORY_GRID)
+                    .layoutStyle(UiLayoutStyle.leaf().size(width, height))
+                    .inventoryGrid(grid));
+            return this;
+        }
+
+        /**
+         * Adds a Minecraft hotbar node.
+         *
+         * @param slots hotbar slot bindings
+         * @param selectedIndex selected hotbar index
+         * @param slotSize slot width and height
+         * @return this builder
+         */
+        public NodeBuilder hotbar(List<UiSlotBinding> slots, int selectedIndex, int slotSize) {
+            List<UiSlotBinding> normalizedSlots = filterSlots(slots);
+            int count = normalizedSlots.isEmpty() ? 9 : normalizedSlots.size();
+            node.add(new UiNode(UiNode.Type.HOTBAR)
+                    .layoutStyle(UiLayoutStyle.leaf().size(Math.max(1, slotSize) * count, Math.max(1, slotSize)))
+                    .slotBindings(normalizedSlots)
+                    .selectedIndex(selectedIndex));
+            return this;
+        }
+
+        /**
+         * Sets Minecraft-aware anchor metadata for this node.
+         *
+         * @param anchor anchor metadata
+         * @return this builder
+         */
+        public NodeBuilder anchor(UiAnchor anchor) {
+            node.anchor(anchor);
+            return this;
+        }
+
+        /**
+         * Sets snap-to-pixel metadata for this node.
+         *
+         * @param enabled snap-to-pixel flag
+         * @return this builder
+         */
+        public NodeBuilder snapToPixel(boolean enabled) {
+            node.snapToPixel(enabled);
             return this;
         }
 
@@ -1509,6 +1601,19 @@ public final class Ui {
         public NodeBuilder icon(String texture, int width, int height) {
             node.add(new UiNode(UiNode.Type.LABEL).layoutStyle(UiLayoutStyle.leaf().size(width, height)).texture(texture));
             return this;
+        }
+
+        private static List<UiSlotBinding> filterSlots(List<UiSlotBinding> slots) {
+            if (slots == null || slots.isEmpty()) {
+                return Collections.emptyList();
+            }
+            List<UiSlotBinding> filtered = new ArrayList<UiSlotBinding>();
+            for (UiSlotBinding slot : slots) {
+                if (slot != null) {
+                    filtered.add(slot);
+                }
+            }
+            return filtered.isEmpty() ? Collections.<UiSlotBinding>emptyList() : filtered;
         }
 
         private static List<UiListItem> optionItems(List<UiOption> options) {

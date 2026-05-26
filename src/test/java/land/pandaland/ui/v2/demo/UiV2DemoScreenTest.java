@@ -23,6 +23,17 @@ public class UiV2DemoScreenTest {
         assertVisible(runtime.screen().root());
     }
 
+    @Test
+    public void demoContainsMinecraftInventoryShowcaseNodes() {
+        UiRuntime runtime = new UiRuntime(UiV2DemoScreen.create());
+        runtime.layout(new UiRect(0, 0, 960, 540));
+
+        assertTrue("Expected ITEM node", contains(runtime.screen().root(), UiNode.Type.ITEM));
+        assertTrue("Expected SLOT node", contains(runtime.screen().root(), UiNode.Type.SLOT));
+        assertTrue("Expected INVENTORY_GRID node", contains(runtime.screen().root(), UiNode.Type.INVENTORY_GRID));
+        assertTrue("Expected HOTBAR node", contains(runtime.screen().root(), UiNode.Type.HOTBAR));
+    }
+
     private static void assertVisible(UiNode node) {
         if (node != null && node.type() != UiNode.Type.ROOT) {
             assertTrue("Expected positive width for " + node.type(), node.bounds().width > 0);
@@ -31,5 +42,20 @@ public class UiV2DemoScreenTest {
         for (UiNode child : node.children()) {
             assertVisible(child);
         }
+    }
+
+    private static boolean contains(UiNode node, UiNode.Type type) {
+        if (node == null) {
+            return false;
+        }
+        if (node.type() == type) {
+            return true;
+        }
+        for (UiNode child : node.children()) {
+            if (contains(child, type)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

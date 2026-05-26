@@ -17,6 +17,9 @@ import land.pandaland.ui.v2.data.UiTreeItem;
 import land.pandaland.ui.v2.event.UiTextValidator;
 import land.pandaland.ui.v2.event.UiValidationResult;
 import land.pandaland.ui.v2.layout.UiRect;
+import land.pandaland.ui.v2.minecraft.UiInventoryGrid;
+import land.pandaland.ui.v2.minecraft.UiItemStackRef;
+import land.pandaland.ui.v2.minecraft.UiSlotBinding;
 import land.pandaland.ui.v2.render.UiCustomDraw;
 import land.pandaland.ui.v2.render.UiRenderCommand;
 import land.pandaland.ui.v2.render.UiRenderList;
@@ -61,7 +64,7 @@ public final class UiV2DemoScreen {
                  * @param root root builder
                  */
                 public void build(Ui.NodeBuilder root) {
-                    root.column()
+                    root.scroll()
                         .padding(18)
                         .gap(6)
                         .label("PandaLand UI v2.1", WIDTH, 14)
@@ -96,6 +99,25 @@ public final class UiV2DemoScreen {
                                     .label("Advanced", WIDTH - 16, 12)
                                     .tree(tree(), selectedRows, WIDTH - 16, 32)
                                     .virtualList(activity(), selectedRows, WIDTH - 16, 10);
+                            }
+                        })
+                        .panel(new Ui.PanelBuilderConsumer() {
+                            public void build(Ui.NodeBuilder panel) {
+                                panel.column()
+                                    .size(WIDTH, 104)
+                                    .padding(8)
+                                    .gap(6)
+                                    .label("Minecraft inventory", WIDTH - 16, 12)
+                                    .row(new Ui.PanelBuilderConsumer() {
+                                        public void build(Ui.NodeBuilder row) {
+                                            row.size(WIDTH - 16, 20)
+                                                .gap(6)
+                                                .item(sampleItem("Panda Token", 3), 18, 18)
+                                                .slot(sampleSlot("preview-slot", 0, "Preview Gem"), 18);
+                                        }
+                                    })
+                                    .inventoryGrid(sampleGrid())
+                                    .hotbar(sampleHotbar(), 2, 18);
                             }
                         })
                         .panel(new Ui.PanelBuilderConsumer() {
@@ -192,6 +214,36 @@ public final class UiV2DemoScreen {
             new UiListItem("auth", "Auth passed"),
             new UiListItem("owner", "Files synced"),
             new UiListItem("game", "Game ready")
+        );
+    }
+
+    private static UiItemStackRef sampleItem(String name, int count) {
+        return UiItemStackRef.empty()
+                .displayName(name)
+                .count(count)
+                .enchanted(true);
+    }
+
+    private static UiSlotBinding sampleSlot(String id, int index, String name) {
+        return new UiSlotBinding(id, index, sampleItem(name, index + 1), true, "", null);
+    }
+
+    private static UiInventoryGrid sampleGrid() {
+        return new UiInventoryGrid(4, 1, 18, 4, Arrays.asList(
+                sampleSlot("grid-0", 0, "Shard"),
+                sampleSlot("grid-1", 1, "Key"),
+                sampleSlot("grid-2", 2, "Ticket"),
+                sampleSlot("grid-3", 3, "Badge")
+        ));
+    }
+
+    private static List<UiSlotBinding> sampleHotbar() {
+        return Arrays.asList(
+                sampleSlot("hotbar-0", 0, "Pickaxe"),
+                sampleSlot("hotbar-1", 1, "Compass"),
+                sampleSlot("hotbar-2", 2, "Menu"),
+                sampleSlot("hotbar-3", 3, "Book"),
+                sampleSlot("hotbar-4", 4, "Star")
         );
     }
 
